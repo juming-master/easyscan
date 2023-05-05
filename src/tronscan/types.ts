@@ -217,3 +217,18 @@ export interface GetTronLogsResponse {
     event: string,
     transaction_id: string
 }
+
+export type GetEtherCompatLogsResponse = {
+    address: string,
+    blockNumber: string,
+    timeStamp: string,
+    logIndex: string,
+    hash: string,
+    // OrdersMatched(bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint256 price, bytes32 indexed metadata)
+    event: string,
+    eventName: string, // only name , no signature
+    result: { [key: number | string]: string },
+    resultType: {
+        [key: string]: ValueType
+    }
+}

@@ -47,15 +47,15 @@ import {
 export * from './types'
 import { URL } from 'whatwg-url'
 import baseURLs from './base-urls'
-import { CustomFetch, GetEtherCompatLogsResponse, GetEtherCompatTxListResponse, Module, defaultCustomFetch } from '../types'
+import { CustomFetch, GetEtherCompatTxListResponse, Module, defaultCustomFetch } from '../types'
 import { omit, findKey } from 'lodash'
 import { BlockNumber } from './types'
 import BigNumber from 'bignumber.js'
-import ethers, { JsonFragment } from 'ethers'
-
+import ethers, { JsonFragment, EtherscanProvider, EtherscanPlugin, Network } from 'ethers'
 
 const MAX_SIZE = 10000
 
+EtherscanProvider
 
 function handleTxList(response: Data<AccountTxListResponse[]>): Data<GetEtherCompatTxListResponse[]> {
     const result = response.result.map(el => {
@@ -77,31 +77,18 @@ function handleTxList(response: Data<AccountTxListResponse[]>): Data<GetEtherCom
     }
 }
 
-function handleLogs(response: Data<GetLogsResponseFormat[]>): Data<GetEtherCompatLogsResponse[]> {
-    const result = response.result.map(el => {
-        return {
-            address: el.address,
-            topics: el.topics,
-            data: el.data,
-            blockNumber: el.blockNumber,
-            timeStamp: el.timeStamp,
-            logIndex: el.logIndex,
-            hash: el.hash,
-        }
-    })
-    return {
-        ...response,
-        result
-    }
+function handleLogs(response: Data<GetLogsResponseFormat[]>): Data<GetLogsResponseFormat[]> {
+    return response
 }
 
 export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch) {
     const fetch = customFetch || defaultCustomFetch
     //@ts-ignore: TS7053
-    const baseURL = Object.keys(baseURLs).includes(chainOrBaseURL) ? baseURLs[chainOrBaseURL] : chainOrBaseURL
+    const baseURL = Object.keys(baseURLs).includes(chainOrBaseURL) ? baseURLs[chainOrBaseURL] : chainOrBaseURL;
     const chain = Object.keys(baseURLs).includes(chainOrBaseURL) ? chainOrBaseURL : findKey(baseURLs, value => chainOrBaseURL.indexOf(value) === 0)
-    const etherscanProvider = new ethers.EtherscanProvider(chain, apiKey)
-
+    const network = new Network(chain || 'unknown', Number(chain || 1))
+    network.attachPlugin(new EtherscanPlugin(baseURL))
+    const etherscanProvider = new EtherscanProvider(network, apiKey);
     async function get<T>(module: string, query: Record<string, any>) {
         const url = new URL(`/api?${qs.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL)
         var data: Data<T> = await fetch(url.toString())
@@ -332,7 +319,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
             /**
                * The Event Log API was designed to provide an alternative to the native eth_getLogs.
                */
-            getLogs: async function (query: GetLogsQuery): Promise<Data<(GetEtherCompatLogsResponse | GetLogsResponseFormat)[]>> {
+            getLogs: async function (query: GetLogsQuery): Promise<Data<(GetLogsResponseFormat)[]>> {
                 const result = await get<GetLogsResponse[]>(Module.Logs, Object.assign({
                     action: 'getLogs',
                     fromBlock: typeof query.startblock === 'undefined' ? 0 : query.startblock,
@@ -341,9 +328,6 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
                     ...response,
                     result: response.result.map(el => ({ ...omit(el, 'transactionHash'), hash: el.transactionHash }))
                 }));
-                if (query.compatable) {
-                    return handleLogs(result)
-                }
                 return result
             }
         },
@@ -418,7 +402,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
 export function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, globalAutoStart: boolean = true) {
     const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch)
     function fetchPageData<Query, ResponseItem extends { blockNumber: string, logIndex?: string, hash: string }>(getData: (query: Query) => Promise<Data<ResponseItem[]>>) {
-        return function (q: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[]) => void, autoStart?: boolean) {
+        return function (q: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
             const query = q as { page: number, offset: number, sort: Sort, startblock?: BlockNumber, endblock?: BlockNumber }
             if (query.offset * query.page > MAX_SIZE) {
                 throw new Error(`page * offset should be less than ${MAX_SIZE}`)
@@ -442,7 +426,7 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                     accItemLength = accItemLength + response.result.length
                     while (response && response.status === '1' && response.result.length > 0) {
                         data.push(...response.result)
-                        cb(response.result, index, data)
+                        cb(response.result, index, data, false)
                         if (accItemLength >= MAX_SIZE) {
                             const startblock = (query.sort === Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock
                             const endblock = query.sort === Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock
@@ -478,6 +462,7 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                             accItemLength = accItemLength + response.result.length
                         }
                     }
+                    cb([], index, data, true)
                 }
             }
 

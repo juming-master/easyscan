@@ -5,7 +5,6 @@ export interface CustomFetch {
 }
 
 export async function defaultCustomFetch<Data>(url: string, config?: AxiosRequestConfig<any>) {
-    console.log(url)
     const response = await axios.get(url, {
         responseType: 'json',
         ...config
@@ -37,16 +36,3 @@ export interface GetEtherCompatTxListResponse {
     isError: boolean;
     input: string;
 }
-
-export type GetEtherCompatLogsResponse = {
-    address: string,
-    blockNumber: string,
-    timeStamp: string,
-    logIndex: string,
-    hash: string
-} & ({
-    result: Record<string, string>,
-} | {
-    topics: string[],
-    data: string
-})

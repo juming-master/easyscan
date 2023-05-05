@@ -12,10 +12,11 @@ import { etherscanPageData } from 'easyscan'
 async function etherscanAPIDemo() {
     const etherscan = etherscanPageData('1', 'API_KEY')
     // page = 1 will scan from page1 to page end.
-    const { resume, stop } = etherscan.logs.getLogs({ address: '0xdac17f958d2ee523a2206206994597c13d831ec7', page: 1, offset: 5000, startblock: 1, endblock: 'latest', topic0: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' }, (pageData, pageIndex, accData) => {
+    const { resume, stop } = etherscan.logs.getLogs({ address: '0xdac17f958d2ee523a2206206994597c13d831ec7', page: 1, offset: 5000, startblock: 1, endblock: 'latest', topic0: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' }, (pageData, pageIndex, accData, isFinish) => {
         // pageData : current page data
         // pageIndex : current page index (index from 0)
         // accData : accumulated data ,it is [...page1,...page2,...page3,...]
+	// isFinish : request is finished or not.
     })
     setTimeout(()=>{
         // stop paging request
@@ -36,8 +37,8 @@ async function etherscanAPIDemo() {
 async function tronscanAPIDemo() {
     const tronscan = tronscanPageData('TronGrid')
     // page = 1 will scan from page1 to page end.
-    const { resume, stop } = tronscan.account.txList({ address: 'TDqMwZVTSPLTCZQC55Db3J69eXY7HLCmfs' }, (pageData, pageIndex, accData) => {
-        console.log(pageIndex, accData.length)
+    const { resume, stop } = tronscan.account.txList({ address: 'TDqMwZVTSPLTCZQC55Db3J69eXY7HLCmfs' }, (pageData, pageIndex, accData, isFinish) => {
+        console.log(pageIndex, accData.length,isFinish)
     })
     // It provides a jsonrpc provider.
     const tx = await tronscan.provider.getTransaction('5e28141b3a2f94551ea3fecd363aadd85db3515b2a35388f0aefac7518bf3898')

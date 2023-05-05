@@ -1,8 +1,16 @@
 {
   "name": "easyscan",
-  "version": "1.0.0",
+  "version": "1.0.11",
   "main": "dist/index.js",
   "types": "types",
+  "keywords": [
+    "easyscan",
+    "etherscan",
+    "tronscan",
+    "ethers",
+    "ethereum",
+    "tron"
+  ],
   "license": "MIT",
   "scripts": {
     "compile": "rm -rf dist && rm -rf types && npx tsc",

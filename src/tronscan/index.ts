@@ -1,7 +1,7 @@
 import qs from 'qs'
 import { URL } from 'whatwg-url'
-import { TronData, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery } from './types'
-import { CustomFetch, GetEtherCompatLogsResponse, GetEtherCompatTxListResponse, Module, defaultCustomFetch } from '../types'
+import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery } from './types'
+import { CustomFetch, GetEtherCompatTxListResponse, Module, defaultCustomFetch } from '../types'
 import baseURLs from './base-urls'
 import omit from 'lodash/omit'
 import { findKey, mapKeys, snakeCase } from 'lodash'
@@ -39,10 +39,13 @@ function handleLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEthe
         return {
             address: el.contract_address,
             result: el.result,
+            resultType: el.result_type,
             blockNumber: Number(el.block_number) + '',
             timeStamp: el.block_timestamp + '',
             logIndex: el.event_index + '',
             hash: el.transaction_id,
+            event: el.event,
+            eventName: el.event_name,
         }
     })
     return {
@@ -115,26 +118,17 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
             }
         },
         [Module.Logs]: {
-            txLogs: async function (query: GetTronTransactionLogsQuery): Promise<TronData<(GetTronLogsResponse | GetEtherCompatLogsResponse)[]>> {
+            txLogs: async function (query: GetTronTransactionLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
                 const result = await get<GetTronLogsResponse[]>(['transactions', query.txId], omit(query, 'txId'))
-                if (options.dataCompatible) {
-                    return handleLogs(result)
-                }
-                return result
+                return handleLogs(result)
             },
-            contractLogs: async function (query: GetTronContractLogsQuery): Promise<TronData<(GetTronLogsResponse | GetEtherCompatLogsResponse)[]>> {
+            contractLogs: async function (query: GetTronContractLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
                 const result = await get<GetTronLogsResponse[]>(['contracts', query.address], omit(query, 'address'))
-                if (options.dataCompatible) {
-                    return handleLogs(result)
-                }
-                return result
+                return handleLogs(result)
             },
-            blockLogs: async function (query: GetTronBlockLogsQuery): Promise<TronData<(GetTronLogsResponse | GetEtherCompatLogsResponse)[]>> {
+            blockLogs: async function (query: GetTronBlockLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
                 const result = await get<GetTronLogsResponse[]>(['blocks', query.blockNumber + ''], omit(query, 'blockNumber'))
-                if (options.dataCompatible) {
-                    return handleLogs(result)
-                }
-                return result
+                return handleLogs(result)
             }
         }
     }
@@ -145,7 +139,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options)
 
     function fetchPageData<Query, ResponseItem>(getData: (query: Query) => Promise<TronData<ResponseItem[]>>) {
-        return function (query: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[]) => void, autoStart?: boolean) {
+        return function (query: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
             const data: ResponseItem[] = []
             let nextLink = ''
             let isStopped = false
@@ -167,7 +161,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                     let response: TronData<ResponseItem[]> | null = await fetchData(query)
                     while (response && response.success && response.data.length > 0) {
                         data.push(...response.data)
-                        cb(response.data, index, data)
+                        cb(response.data, index, data, false)
                         if (response.meta.links?.next) {
                             nextLink = response.meta.links.next
                             if (isStopped) {
@@ -178,6 +172,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                             response = null
                         }
                     }
+                    cb([], index, data, true)
                 }
             }
 
