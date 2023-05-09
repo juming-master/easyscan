@@ -122,7 +122,8 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
     const get = async function <T>(module: string, query: Record<string, any>) {
         const urlObj = new URL(`/api?${qs.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL)
         const url = urlObj.toString()
-        if (typeof options.retry === 'undefined') {
+        const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3)
+        if (retries === 0) {
             const data = await request<T>(url)
             if (options.debug) {
                 console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${url}`)
@@ -132,10 +133,10 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
         const operation = retry.operation(Object.assign({
             minTimeout: 10000,
             randomize: false
-        }, typeof options.retry === 'number' ? {
-            retries: options.retry || 0,
-        } : {
+        }, typeof retries === 'string' ? {
             forever: true
+        } : {
+            retries: retries,
         }))
         return new Promise<Data<T>>((resolve, reject) => {
             operation.attempt(function (attempt) {

@@ -150,14 +150,15 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
     const fetch = customFetch || defaultCustomFetch
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options)
 
+    const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3)
     const operation = retry.operation(Object.assign({
         minTimeout: 10000,
         maxTimeout: 30000,
         randomize: false
-    }, typeof options.retry === 'number' ? {
-        retries: options.retry || 0,
-    } : {
+    }, typeof retries === 'string' ? {
         forever: true
+    } : {
+        retries: retries,
     }))
     function fetchPageData<Query, ResponseItem>(getData: (query: Query) => Promise<TronData<ResponseItem[]>>) {
         return function (query: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
@@ -183,14 +184,12 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                     return data
                 } catch (e) {
                     // @ts-ignore
-                    currentLink = e.url
-                    nextLink = ''
                     throw e
                 }
             }
 
             const get = async function (query: Query) {
-                if (typeof options.retry === 'undefined') {
+                if (retries === 0) {
                     const data = await request(query)
                     if (options.debug) {
                         console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${currentLink}`)
@@ -207,7 +206,8 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                         }).catch(e => {
                             if (operation.retry(e)) {
                                 if (options?.debug) {
-                                    console.log(`${colors.yellow(`${nodeEmoji.find('❗️')?.emoji}Retry ${attempt} times due to [${e.message}]: `)} ${currentLink}`)
+                                    const message = e?.response?.data?.error || e.message
+                                    console.log(`${colors.yellow(`${nodeEmoji.find('❗️')?.emoji}Retry ${attempt} times due to [${message}]: `)} ${nextLink}`)
                                 }
                                 return;
                             }

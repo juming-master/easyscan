@@ -165,14 +165,15 @@ exports.tronscanAPI = tronscanAPI;
 function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globalAutoStart: true }) {
     const fetch = customFetch || utils_1.defaultCustomFetch;
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options);
+    const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3);
     const operation = retry_1.default.operation(Object.assign({
         minTimeout: 10000,
         maxTimeout: 30000,
         randomize: false
-    }, typeof options.retry === 'number' ? {
-        retries: options.retry || 0,
-    } : {
+    }, typeof retries === 'string' ? {
         forever: true
+    } : {
+        retries: retries,
     }));
     function fetchPageData(getData) {
         return function (query, cb, autoStart) {
@@ -200,8 +201,6 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                     }
                     catch (e) {
                         // @ts-ignore
-                        currentLink = e.url;
-                        nextLink = '';
                         throw e;
                     }
                 });
@@ -209,7 +208,7 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
             const get = function (query) {
                 var _a;
                 return __awaiter(this, void 0, void 0, function* () {
-                    if (typeof options.retry === 'undefined') {
+                    if (retries === 0) {
                         const data = yield request(query);
                         if (options.debug) {
                             console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${currentLink}`);
@@ -225,10 +224,11 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                                 }
                                 resolve(data);
                             }).catch(e => {
-                                var _a;
+                                var _a, _b, _c;
                                 if (operation.retry(e)) {
                                     if (options === null || options === void 0 ? void 0 : options.debug) {
-                                        console.log(`${colors_1.default.yellow(`${(_a = node_emoji_1.default.find('❗️')) === null || _a === void 0 ? void 0 : _a.emoji}Retry ${attempt} times due to [${e.message}]: `)} ${currentLink}`);
+                                        const message = ((_b = (_a = e === null || e === void 0 ? void 0 : e.response) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.error) || e.message;
+                                        console.log(`${colors_1.default.yellow(`${(_c = node_emoji_1.default.find('❗️')) === null || _c === void 0 ? void 0 : _c.emoji}Retry ${attempt} times due to [${message}]: `)} ${nextLink}`);
                                     }
                                     return;
                                 }

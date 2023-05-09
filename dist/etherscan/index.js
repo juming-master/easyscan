@@ -112,7 +112,8 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
         return __awaiter(this, void 0, void 0, function* () {
             const urlObj = new whatwg_url_1.URL(`/api?${qs_1.default.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL);
             const url = urlObj.toString();
-            if (typeof options.retry === 'undefined') {
+            const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3);
+            if (retries === 0) {
                 const data = yield request(url);
                 if (options.debug) {
                     console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${url}`);
@@ -122,10 +123,10 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             const operation = retry_1.default.operation(Object.assign({
                 minTimeout: 10000,
                 randomize: false
-            }, typeof options.retry === 'number' ? {
-                retries: options.retry || 0,
-            } : {
+            }, typeof retries === 'string' ? {
                 forever: true
+            } : {
+                retries: retries,
             }));
             return new Promise((resolve, reject) => {
                 operation.attempt(function (attempt) {
