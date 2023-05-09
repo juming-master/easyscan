@@ -428,7 +428,7 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                     data.push(...response.result)
                     cb(response.result, index, data, false)
                     while (response.result.length === offset) {
-                        if (accItemLength >= MAX_SIZE) {
+                        if (accItemLength + offset > MAX_SIZE) {
                             const startblock = (query.sort === Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock
                             const endblock = query.sort === Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock
                             page = 1
@@ -446,17 +446,17 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                             if (isStopped) {
                                 break;
                             }
-                            const res = await fetchData(nextQuery)
-                            const last2000Data = data.slice(-2000)
-                            response = {
-                                ...res,
-                                result: res.result.filter(el => {
+                            response = await fetchData(nextQuery)
+                            const last2000Data = data.slice(-offset)
+                            const uniqResponse = {
+                                ...response,
+                                result: response.result.filter(el => {
                                     return !last2000Data.find(item => item.blockNumber === el.blockNumber && item.hash === el.hash && item.logIndex === el.logIndex)
                                 })
                             }
-                            accItemLength = res.result.length
-                            data.push(...response.result)
-                            cb(response.result, index, data, false)
+                            accItemLength = response.result.length
+                            data.push(...uniqResponse.result)
+                            cb(uniqResponse.result, index, data, false)
                         } else {
                             page++
                             nextQuery = {
