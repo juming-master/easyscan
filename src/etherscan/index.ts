@@ -423,11 +423,11 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
 
             async function loop() {
                 if (!isStopped) {
-                    let response: Data<ResponseItem[]> | null = await fetchData(Object.assign({}, query, { offset }))
+                    let response: Data<ResponseItem[]> = await fetchData(Object.assign({}, query, { offset }))
                     accItemLength = accItemLength + response.result.length
-                    while (response && response.status === '1' && response.result.length === offset) {
-                        data.push(...response.result)
-                        cb(response.result, index, data, false)
+                    data.push(...response.result)
+                    cb(response.result, index, data, false)
+                    while (response.result.length === offset) {
                         if (accItemLength >= MAX_SIZE) {
                             const startblock = (query.sort === Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock
                             const endblock = query.sort === Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock
@@ -455,9 +455,8 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                                 })
                             }
                             accItemLength = res.result.length
-                            if (res.result.length < offset) {
-                                break
-                            }
+                            data.push(...response.result)
+                            cb(response.result, index, data, false)
                         } else {
                             page++
                             nextQuery = {
@@ -470,9 +469,8 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                             }
                             response = await fetchData(nextQuery)
                             accItemLength = accItemLength + response.result.length
-                            if (response.result.length < offset) {
-                                break
-                            }
+                            data.push(...response.result)
+                            cb(response.result, index, data, false)
                         }
                     }
                     cb([], index, data, true)

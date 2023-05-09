@@ -422,9 +422,9 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
                     if (!isStopped) {
                         let response = yield fetchData(Object.assign({}, query, { offset }));
                         accItemLength = accItemLength + response.result.length;
-                        while (response && response.status === '1' && response.result.length === offset) {
-                            data.push(...response.result);
-                            cb(response.result, index, data, false);
+                        data.push(...response.result);
+                        cb(response.result, index, data, false);
+                        while (response.result.length === offset) {
                             if (accItemLength >= MAX_SIZE) {
                                 const startblock = (query.sort === types_1.Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock;
                                 const endblock = query.sort === types_1.Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock;
@@ -446,9 +446,8 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
                                         return !last2000Data.find(item => item.blockNumber === el.blockNumber && item.hash === el.hash && item.logIndex === el.logIndex);
                                     }) });
                                 accItemLength = res.result.length;
-                                if (res.result.length < offset) {
-                                    break;
-                                }
+                                data.push(...response.result);
+                                cb(response.result, index, data, false);
                             }
                             else {
                                 page++;
@@ -459,9 +458,8 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
                                 }
                                 response = yield fetchData(nextQuery);
                                 accItemLength = accItemLength + response.result.length;
-                                if (response.result.length < offset) {
-                                    break;
-                                }
+                                data.push(...response.result);
+                                cb(response.result, index, data, false);
                             }
                         }
                         cb([], index, data, true);

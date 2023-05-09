@@ -130,19 +130,19 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
         [types_1.Module.Logs]: {
             txLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    const result = yield get(['transactions', query.txId], (0, omit_1.default)(query, 'txId'));
+                    const result = yield get(['transactions', query.txId, 'events'], (0, omit_1.default)(query, 'txId'));
                     return handleLogs(result);
                 });
             },
             contractLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    const result = yield get(['contracts', query.address], (0, omit_1.default)(query, 'address'));
+                    const result = yield get(['contracts', query.address, 'events'], (0, omit_1.default)(query, 'address'));
                     return handleLogs(result);
                 });
             },
             blockLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    const result = yield get(['blocks', query.blockNumber + ''], (0, omit_1.default)(query, 'blockNumber'));
+                    const result = yield get(['blocks', query.blockNumber + '', 'events'], (0, omit_1.default)(query, 'blockNumber'));
                     return handleLogs(result);
                 });
             }

@@ -119,15 +119,15 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
         },
         [Module.Logs]: {
             txLogs: async function (query: GetTronTransactionLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
-                const result = await get<GetTronLogsResponse[]>(['transactions', query.txId], omit(query, 'txId'))
+                const result = await get<GetTronLogsResponse[]>(['transactions', query.txId, 'events'], omit(query, 'txId'))
                 return handleLogs(result)
             },
             contractLogs: async function (query: GetTronContractLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
-                const result = await get<GetTronLogsResponse[]>(['contracts', query.address], omit(query, 'address'))
+                const result = await get<GetTronLogsResponse[]>(['contracts', query.address, 'events'], omit(query, 'address'))
                 return handleLogs(result)
             },
             blockLogs: async function (query: GetTronBlockLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
-                const result = await get<GetTronLogsResponse[]>(['blocks', query.blockNumber + ''], omit(query, 'blockNumber'))
+                const result = await get<GetTronLogsResponse[]>(['blocks', query.blockNumber + '', 'events'], omit(query, 'blockNumber'))
                 return handleLogs(result)
             }
         }
