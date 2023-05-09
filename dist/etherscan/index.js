@@ -407,6 +407,7 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
             let isStopped = false;
             let index = 0;
             let page = query.page;
+            const offset = query.offset || 10000;
             let accItemLength = 0;
             let nextQuery = query;
             function fetchData(query) {
@@ -419,16 +420,23 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
             function loop() {
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!isStopped) {
-                        let response = yield fetchData(query);
+                        let response = yield fetchData(Object.assign({}, query, { offset }));
                         accItemLength = accItemLength + response.result.length;
-                        while (response && response.status === '1' && response.result.length > 0) {
+                        while (response && response.status === '1' && response.result.length === offset) {
                             data.push(...response.result);
                             cb(response.result, index, data, false);
                             if (accItemLength >= MAX_SIZE) {
                                 const startblock = (query.sort === types_1.Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock;
                                 const endblock = query.sort === types_1.Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock;
                                 page = 1;
-                                nextQuery = Object.assign(Object.assign({}, nextQuery), { startblock: startblock, endblock: endblock, page });
+                                nextQuery = Object.assign(Object.assign({}, nextQuery), { page,
+                                    offset });
+                                if (startblock !== undefined) {
+                                    nextQuery.startblock = startblock;
+                                }
+                                if (endblock !== undefined) {
+                                    nextQuery.endblock = endblock;
+                                }
                                 if (isStopped) {
                                     break;
                                 }
@@ -438,15 +446,22 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
                                         return !last2000Data.find(item => item.blockNumber === el.blockNumber && item.hash === el.hash && item.logIndex === el.logIndex);
                                     }) });
                                 accItemLength = res.result.length;
+                                if (res.result.length < offset) {
+                                    break;
+                                }
                             }
                             else {
                                 page++;
-                                nextQuery = Object.assign(Object.assign({}, nextQuery), { page });
+                                nextQuery = Object.assign(Object.assign({}, nextQuery), { page,
+                                    offset });
                                 if (isStopped) {
                                     break;
                                 }
                                 response = yield fetchData(nextQuery);
                                 accItemLength = accItemLength + response.result.length;
+                                if (response.result.length < offset) {
+                                    break;
+                                }
                             }
                         }
                         cb([], index, data, true);

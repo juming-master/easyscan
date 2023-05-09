@@ -16,6 +16,7 @@ exports.Module = exports.defaultCustomFetch = void 0;
 const axios_1 = __importDefault(require("axios"));
 function defaultCustomFetch(url, config) {
     return __awaiter(this, void 0, void 0, function* () {
+        // console.log(url)
         const response = yield axios_1.default.get(url, Object.assign({ responseType: 'json' }, config));
         var data = response.data;
         return data;
