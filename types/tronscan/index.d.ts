@@ -3,6 +3,7 @@ import { CustomFetch, GetEtherCompatTxListResponse } from '../types';
 import TronProvider from './tron-jsonrpc-provider';
 export declare function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options?: {
     dataCompatible?: boolean;
+    debug?: boolean;
 }): {
     provider: TronProvider;
     account: {
@@ -23,6 +24,7 @@ export declare function tronscanAPI(chainOrBaseURL: string, apiKey?: string, cus
 export declare function tronscanPageData(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options?: {
     dataCompatible?: boolean;
     globalAutoStart?: boolean;
+    debug?: boolean;
 }): {
     provider: TronProvider;
     account: {

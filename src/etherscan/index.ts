@@ -81,7 +81,7 @@ function handleLogs(response: Data<GetLogsResponseFormat[]>): Data<GetLogsRespon
     return response
 }
 
-export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch) {
+export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: { debug?: boolean } = { debug: false }) {
     const fetch = customFetch || defaultCustomFetch
     //@ts-ignore: TS7053
     const baseURL = Object.keys(baseURLs).includes(chainOrBaseURL) ? baseURLs[chainOrBaseURL] : chainOrBaseURL;
@@ -91,7 +91,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
     const etherscanProvider = new EtherscanProvider(network, apiKey);
     async function get<T>(module: string, query: Record<string, any>) {
         const url = new URL(`/api?${qs.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL)
-        var data: Data<T> = await fetch(url.toString())
+        var data: Data<T> = await fetch(url.toString(), Object.assign({ debug: options.debug }))
         if (data.status && data.status !== Status.SUCCESS) {
             let returnMessage: string = data.message || 'NOTOK';
             if (returnMessage === 'No transactions found' || returnMessage === 'No records found') {
@@ -399,8 +399,8 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
     }
 }
 
-export function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, globalAutoStart: boolean = true) {
-    const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch)
+export function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: { debug?: boolean, globalAutoStart?: boolean } = { globalAutoStart: true }) {
+    const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch, options)
     function fetchPageData<Query, ResponseItem extends { blockNumber: string, logIndex?: string, hash: string }>(getData: (query: Query) => Promise<Data<ResponseItem[]>>) {
         return function (q: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
             const query = q as { page: number, offset: number, sort: Sort, startblock?: BlockNumber, endblock?: BlockNumber }
@@ -486,7 +486,7 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                 isStopped = true
                 return nextQuery
             }
-            if (typeof autoStart === 'boolean' ? autoStart : globalAutoStart) {
+            if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
                 resume()
             }
 

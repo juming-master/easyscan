@@ -1,14 +1,17 @@
 import axios, { AxiosRequestConfig } from "axios"
+import { omit } from "lodash"
 
 export interface CustomFetch {
-    (url: string, config?: AxiosRequestConfig<any>): Promise<any>
+    (url: string, config?: AxiosRequestConfig<any> & { debug?: boolean }): Promise<any>
 }
 
-export async function defaultCustomFetch<Data>(url: string, config?: AxiosRequestConfig<any>) {
-    // console.log(url)
+export const defaultCustomFetch = async function <Data>(url: string, config?: AxiosRequestConfig<any> & { debug?: boolean }) {
+    if (config && config.debug) {
+        console.log(url)
+    }
     const response = await axios.get(url, {
         responseType: 'json',
-        ...config
+        ...omit(config, 'debug')
     })
     var data: Data = response.data
     return data

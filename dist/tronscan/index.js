@@ -58,7 +58,7 @@ function handleLogs(response) {
     });
     return Object.assign(Object.assign({}, response), { data });
 }
-function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false }) {
+function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false, debug: false }) {
     const fetch = customFetch || types_1.defaultCustomFetch;
     // @ts-ignore: TS7053
     const baseURL = Object.keys(base_urls_1.default).includes(chainOrBaseURL) ? base_urls_1.default[chainOrBaseURL] : chainOrBaseURL;
@@ -71,12 +71,12 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
                 url.search = qs_1.default.stringify((0, lodash_1.mapKeys)(query, (_, key) => (0, lodash_1.snakeCase)(key)));
             }
             try {
-                var data = yield fetch(url.toString(), apiKey ? {
+                var data = yield fetch(url.toString(), Object.assign({ debug: options.debug }, apiKey ? {
                     headers: {
                         TRON_PRO_API_KEY: apiKey,
                         'Content-Type': 'application/json'
                     }
-                } : undefined);
+                } : undefined));
                 if (!data.success) {
                     let returnMessage = data.error || 'NOTOK';
                     throw new Error(returnMessage);
@@ -150,7 +150,7 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
     };
 }
 exports.tronscanAPI = tronscanAPI;
-function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false, globalAutoStart: true }) {
+function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globalAutoStart: true }) {
     const fetch = customFetch || types_1.defaultCustomFetch;
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options);
     function fetchPageData(getData) {
@@ -166,7 +166,7 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { dataC
                         data = yield getData(Object.assign({}, query));
                     }
                     else {
-                        data = yield fetch(nextLink);
+                        data = yield fetch(nextLink, options);
                     }
                     index++;
                     return data;
@@ -203,7 +203,7 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { dataC
                 isStopped = true;
                 return nextLink || query;
             }
-            if (typeof autoStart === 'boolean' ? autoStart : options.globalAutoStart) {
+            if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
                 resume();
             }
             return { resume, stop };

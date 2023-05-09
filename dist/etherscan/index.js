@@ -69,7 +69,7 @@ function handleTxList(response) {
 function handleLogs(response) {
     return response;
 }
-function etherscanAPI(chainOrBaseURL, apiKey, customFetch) {
+function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: false }) {
     const fetch = customFetch || types_2.defaultCustomFetch;
     //@ts-ignore: TS7053
     const baseURL = Object.keys(base_urls_1.default).includes(chainOrBaseURL) ? base_urls_1.default[chainOrBaseURL] : chainOrBaseURL;
@@ -80,7 +80,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch) {
     function get(module, query) {
         return __awaiter(this, void 0, void 0, function* () {
             const url = new whatwg_url_1.URL(`/api?${qs_1.default.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL);
-            var data = yield fetch(url.toString());
+            var data = yield fetch(url.toString(), Object.assign({ debug: options.debug }));
             if (data.status && data.status !== types_1.Status.SUCCESS) {
                 let returnMessage = data.message || 'NOTOK';
                 if (returnMessage === 'No transactions found' || returnMessage === 'No records found') {
@@ -395,8 +395,8 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch) {
     };
 }
 exports.etherscanAPI = etherscanAPI;
-function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart = true) {
-    const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch);
+function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globalAutoStart: true }) {
+    const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch, options);
     function fetchPageData(getData) {
         return function (q, cb, autoStart) {
             const query = q;
@@ -474,7 +474,7 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, globalAutoStart 
                 isStopped = true;
                 return nextQuery;
             }
-            if (typeof autoStart === 'boolean' ? autoStart : globalAutoStart) {
+            if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
                 resume();
             }
             return { resume, stop };

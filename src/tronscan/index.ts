@@ -54,7 +54,7 @@ function handleLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEthe
     }
 }
 
-export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean } = { dataCompatible: false }) {
+export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean, debug?: boolean } = { dataCompatible: false, debug: false }) {
     const fetch = customFetch || defaultCustomFetch
     // @ts-ignore: TS7053
     const baseURL: string = Object.keys(baseURLs).includes(chainOrBaseURL) ? baseURLs[chainOrBaseURL] : chainOrBaseURL
@@ -67,12 +67,12 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
             url.search = qs.stringify(mapKeys(query, (_, key) => snakeCase(key)))
         }
         try {
-            var data: TronData<T> = await fetch(url.toString(), apiKey ? {
+            var data: TronData<T> = await fetch(url.toString(), Object.assign({ debug: options.debug }, apiKey ? {
                 headers: {
                     TRON_PRO_API_KEY: apiKey,
                     'Content-Type': 'application/json'
                 }
-            } : undefined)
+            } : undefined))
             if (!data.success) {
                 let returnMessage: string = data.error || 'NOTOK';
                 throw new Error(returnMessage)
@@ -134,7 +134,7 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
     }
 }
 
-export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean, globalAutoStart?: boolean } = { dataCompatible: false, globalAutoStart: true }) {
+export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean, globalAutoStart?: boolean, debug?: boolean } = { globalAutoStart: true }) {
     const fetch = customFetch || defaultCustomFetch
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options)
 
@@ -150,7 +150,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                 if (!nextLink) {
                     data = await getData({ ...query })
                 } else {
-                    data = await fetch(nextLink)
+                    data = await fetch(nextLink, options)
                 }
                 index++
                 return data
@@ -185,7 +185,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                 isStopped = true
                 return nextLink || query
             }
-            if (typeof autoStart === 'boolean' ? autoStart : options.globalAutoStart) {
+            if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
                 resume()
             }
 

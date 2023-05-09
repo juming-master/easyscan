@@ -14,14 +14,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Module = exports.defaultCustomFetch = void 0;
 const axios_1 = __importDefault(require("axios"));
-function defaultCustomFetch(url, config) {
+const lodash_1 = require("lodash");
+const defaultCustomFetch = function (url, config) {
     return __awaiter(this, void 0, void 0, function* () {
-        // console.log(url)
-        const response = yield axios_1.default.get(url, Object.assign({ responseType: 'json' }, config));
+        if (config && config.debug) {
+            console.log(url);
+        }
+        const response = yield axios_1.default.get(url, Object.assign({ responseType: 'json' }, (0, lodash_1.omit)(config, 'debug')));
         var data = response.data;
         return data;
     });
-}
+};
 exports.defaultCustomFetch = defaultCustomFetch;
 var Module;
 (function (Module) {

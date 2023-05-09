@@ -1,8 +1,12 @@
 import { AxiosRequestConfig } from "axios";
 export interface CustomFetch {
-    (url: string, config?: AxiosRequestConfig<any>): Promise<any>;
+    (url: string, config?: AxiosRequestConfig<any> & {
+        debug?: boolean;
+    }): Promise<any>;
 }
-export declare function defaultCustomFetch<Data>(url: string, config?: AxiosRequestConfig<any>): Promise<Data>;
+export declare const defaultCustomFetch: <Data>(url: string, config?: AxiosRequestConfig<any> & {
+    debug?: boolean;
+}) => Promise<Data>;
 export declare enum Module {
     Provider = "provider",
     Account = "account",

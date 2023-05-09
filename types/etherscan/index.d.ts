@@ -3,7 +3,9 @@ export * from './types';
 import { CustomFetch, GetEtherCompatTxListResponse } from '../types';
 import { BlockNumber } from './types';
 import ethers from 'ethers';
-export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch): {
+export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: {
+    debug?: boolean;
+}): {
     provider: ethers.ethers.EtherscanProvider;
     account: {
         /**
@@ -86,7 +88,10 @@ export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, cus
         getTxReceiptStatus: (query: GetTransactionReceiptStatusQuery) => Promise<GetTransactionReceiptStatusResponse>;
     };
 };
-export declare function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, globalAutoStart?: boolean): {
+export declare function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: {
+    debug?: boolean;
+    globalAutoStart?: boolean;
+}): {
     account: {
         txList: (q: AccountTxListQuery, cb: (currentPageData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], currentPageIndex: number, accumulatedData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
