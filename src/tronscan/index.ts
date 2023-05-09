@@ -1,13 +1,17 @@
 import qs from 'qs'
 import { URL } from 'whatwg-url'
 import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery } from './types'
-import { CustomFetch, GetEtherCompatTxListResponse, Module, defaultCustomFetch } from '../types'
+import { GetEtherCompatTxListResponse, Module } from '../types'
+import { CustomFetch, FetchCustomConfig, defaultCustomFetch } from '../utils'
 import baseURLs from './base-urls'
 import omit from 'lodash/omit'
 import { findKey, mapKeys, snakeCase } from 'lodash'
 import BigNumber from 'bignumber.js'
-import { JsonRpcProvider } from 'ethers'
 import TronProvider from './tron-jsonrpc-provider'
+import defaultsDeep from 'lodash/defaultsDeep'
+import colors from 'colors'
+import nodeEmoji from 'node-emoji'
+import retry from 'retry'
 
 function handleTxList(response: TronData<GetTronAccountTxListResponse[]>): TronData<GetEtherCompatTxListResponse[]> {
     const data = response.data.map(el => {
@@ -54,8 +58,9 @@ function handleLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEthe
     }
 }
 
-export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean, debug?: boolean } = { dataCompatible: false, debug: false }) {
+export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean } & FetchCustomConfig = { dataCompatible: false }) {
     const fetch = customFetch || defaultCustomFetch
+
     // @ts-ignore: TS7053
     const baseURL: string = Object.keys(baseURLs).includes(chainOrBaseURL) ? baseURLs[chainOrBaseURL] : chainOrBaseURL
     const chain = Object.keys(baseURLs).includes(chainOrBaseURL) ? chainOrBaseURL : findKey(baseURLs, value => chainOrBaseURL.indexOf(value) === 0)
@@ -67,7 +72,7 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
             url.search = qs.stringify(mapKeys(query, (_, key) => snakeCase(key)))
         }
         try {
-            var data: TronData<T> = await fetch(url.toString(), Object.assign({ debug: options.debug }, apiKey ? {
+            var data: TronData<T> = await fetch(url.toString(), Object.assign({}, apiKey ? {
                 headers: {
                     TRON_PRO_API_KEY: apiKey,
                     'Content-Type': 'application/json'
@@ -77,9 +82,16 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
                 let returnMessage: string = data.error || 'NOTOK';
                 throw new Error(returnMessage)
             }
-            return data
+            return defaultsDeep(data, {
+                meta: {
+                    links: {
+                        current: url.toString()
+                    }
+                }
+            }) as TronData<T>
         } catch (e) {
-            debugger
+            // @ts-ignore
+            e.url = url.toString()
             throw e
         }
     }
@@ -134,40 +146,91 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
     }
 }
 
-export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean, globalAutoStart?: boolean, debug?: boolean } = { globalAutoStart: true }) {
+export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean, globalAutoStart?: boolean } & FetchCustomConfig = { globalAutoStart: true }) {
     const fetch = customFetch || defaultCustomFetch
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options)
 
+    const operation = retry.operation(Object.assign({
+        minTimeout: 10000,
+        maxTimeout: 30000,
+        randomize: false
+    }, typeof options.retry === 'number' ? {
+        retries: options.retry || 0,
+    } : {
+        forever: true
+    }))
     function fetchPageData<Query, ResponseItem>(getData: (query: Query) => Promise<TronData<ResponseItem[]>>) {
         return function (query: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
             const data: ResponseItem[] = []
             let nextLink = ''
+            let currentLink = ''
             let isStopped = false
             let index = 0
 
-            async function fetchData(query: Query) {
-                let data: TronData<ResponseItem[]>
-                if (!nextLink) {
-                    data = await getData({ ...query })
-                } else {
-                    data = await fetch(nextLink, options)
+
+            const request = async function (query: Query) {
+                try {
+                    let data: TronData<ResponseItem[]>
+                    if (!nextLink) {
+                        data = await getData({ ...query })
+                        currentLink = data.meta.links?.current || ''
+                    } else {
+                        data = await fetch(nextLink, options)
+                        currentLink = nextLink || ''
+                    }
+                    index++
+                    nextLink = data.meta.links?.next || ''
+                    return data
+                } catch (e) {
+                    // @ts-ignore
+                    currentLink = e.url
+                    nextLink = ''
+                    throw e
                 }
-                index++
-                return data
+            }
+
+            const get = async function (query: Query) {
+                if (typeof options.retry === 'undefined') {
+                    const data = await request(query)
+                    if (options.debug) {
+                        console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${currentLink}`)
+                    }
+                    return data
+                }
+                return new Promise<TronData<ResponseItem[]>>((resolve, reject) => {
+                    operation.attempt(function (attempt) {
+                        request(query).then((data) => {
+                            if (options?.debug) {
+                                console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${currentLink}`)
+                            }
+                            resolve(data)
+                        }).catch(e => {
+                            if (operation.retry(e)) {
+                                if (options?.debug) {
+                                    console.log(`${colors.yellow(`${nodeEmoji.find('❗️')?.emoji}Retry ${attempt} times due to [${e.message}]: `)} ${currentLink}`)
+                                }
+                                return;
+                            }
+                            reject(operation.mainError())
+                        })
+                    })
+                })
             }
 
             async function loop() {
                 if (!isStopped) {
-                    let response: TronData<ResponseItem[]> | null = await fetchData(query)
+                    let response: TronData<ResponseItem[]> | null = await get(query)
                     while (response && response.success && response.data.length > 0) {
                         data.push(...response.data)
                         cb(response.data, index, data, false)
-                        if (response.meta.links?.next) {
-                            nextLink = response.meta.links.next
+                        if (nextLink) {
                             if (isStopped) {
-                                break;
+                                if (options.debug) {
+                                    console.log(`${colors.red('Stop')}`)
+                                }
+                                return;
                             }
-                            response = await fetchData(query)
+                            response = await get(query)
                         } else {
                             response = null
                         }
@@ -177,16 +240,23 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
             }
 
             function resume() {
+                if (!isStopped) {
+                    return
+                }
+                if (options.debug) {
+                    console.log(`${colors.green('Resume')}`)
+                }
                 isStopped = false
                 loop()
             }
 
             function stop() {
                 isStopped = true
-                return nextLink || query
+                return nextLink || currentLink
             }
+
             if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
-                resume()
+                loop()
             }
 
             return { resume, stop }

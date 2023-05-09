@@ -15,6 +15,7 @@ export type TronData<T> = {
         fingerprint?: string;
         links?: {
             next: string;
+            current: string;
         };
     };
 };

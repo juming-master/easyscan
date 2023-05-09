@@ -17,7 +17,8 @@ export type TronData<T> = {
         page_size: number,
         fingerprint?: string,
         links?: {
-            next: string
+            next: string,
+            current: string
         }
     }
 }

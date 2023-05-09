@@ -1,10 +1,10 @@
 import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronContractLogsQuery, GetTronBlockLogsQuery } from './types';
-import { CustomFetch, GetEtherCompatTxListResponse } from '../types';
+import { GetEtherCompatTxListResponse } from '../types';
+import { CustomFetch, FetchCustomConfig } from '../utils';
 import TronProvider from './tron-jsonrpc-provider';
 export declare function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options?: {
     dataCompatible?: boolean;
-    debug?: boolean;
-}): {
+} & FetchCustomConfig): {
     provider: TronProvider;
     account: {
         accountInfo: (query: GetTronAccountInfoQuery) => Promise<GetTronAccountInfoResponseOrigin>;
@@ -24,42 +24,41 @@ export declare function tronscanAPI(chainOrBaseURL: string, apiKey?: string, cus
 export declare function tronscanPageData(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options?: {
     dataCompatible?: boolean;
     globalAutoStart?: boolean;
-    debug?: boolean;
-}): {
+} & FetchCustomConfig): {
     provider: TronProvider;
     account: {
         accountInfo: (query: GetTronAccountInfoQuery) => Promise<GetTronAccountInfoResponseOrigin>;
         txList: (query: GetTronAccountTxListQuery, cb: (currentPageData: (GetEtherCompatTxListResponse | GetTronAccountTxListResponse)[], currentPageIndex: number, accumulatedData: (GetEtherCompatTxListResponse | GetTronAccountTxListResponse)[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronAccountTxListQuery;
+            stop: () => string;
         };
         tokenTransfer: (query: GetTronAccountTokenTransferQuery, cb: (currentPageData: GetTronAccountTokenTransferResponse[], currentPageIndex: number, accumulatedData: GetTronAccountTokenTransferResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronAccountTokenTransferQuery;
+            stop: () => string;
         };
     };
     contract: {
         tokenBalance: (query: GetTronTokenBalanceQuery, cb: (currentPageData: GetTronTokenBalanceResponse[], currentPageIndex: number, accumulatedData: GetTronTokenBalanceResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronTokenBalanceQuery;
+            stop: () => string;
         };
         txList: (query: GetTronAccountTxListQuery, cb: (currentPageData: (GetEtherCompatTxListResponse | GetTronAccountTxListResponse)[], currentPageIndex: number, accumulatedData: (GetEtherCompatTxListResponse | GetTronAccountTxListResponse)[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronAccountTxListQuery;
+            stop: () => string;
         };
     };
     logs: {
         txLogs: (query: GetTronTransactionLogsQuery, cb: (currentPageData: GetEtherCompatLogsResponse[], currentPageIndex: number, accumulatedData: GetEtherCompatLogsResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronTransactionLogsQuery;
+            stop: () => string;
         };
         contractLogs: (query: GetTronContractLogsQuery, cb: (currentPageData: GetEtherCompatLogsResponse[], currentPageIndex: number, accumulatedData: GetEtherCompatLogsResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronContractLogsQuery;
+            stop: () => string;
         };
         blockLogs: (query: GetTronBlockLogsQuery, cb: (currentPageData: GetEtherCompatLogsResponse[], currentPageIndex: number, accumulatedData: GetEtherCompatLogsResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;
-            stop: () => string | GetTronBlockLogsQuery;
+            stop: () => string;
         };
     };
 };

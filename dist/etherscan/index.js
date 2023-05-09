@@ -44,10 +44,14 @@ const types_1 = require("./types");
 __exportStar(require("./types"), exports);
 const whatwg_url_1 = require("whatwg-url");
 const base_urls_1 = __importDefault(require("./base-urls"));
+const utils_1 = require("../utils");
 const types_2 = require("../types");
 const lodash_1 = require("lodash");
 const bignumber_js_1 = __importDefault(require("bignumber.js"));
 const ethers_1 = __importStar(require("ethers"));
+const retry_1 = __importDefault(require("retry"));
+const colors_1 = __importDefault(require("colors"));
+const node_emoji_1 = __importDefault(require("node-emoji"));
 const MAX_SIZE = 10000;
 ethers_1.EtherscanProvider;
 function handleTxList(response) {
@@ -69,18 +73,17 @@ function handleTxList(response) {
 function handleLogs(response) {
     return response;
 }
-function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: false }) {
-    const fetch = customFetch || types_2.defaultCustomFetch;
+function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: false, retry: 3 }) {
+    const fetch = customFetch || utils_1.defaultCustomFetch;
     //@ts-ignore: TS7053
     const baseURL = Object.keys(base_urls_1.default).includes(chainOrBaseURL) ? base_urls_1.default[chainOrBaseURL] : chainOrBaseURL;
     const chain = Object.keys(base_urls_1.default).includes(chainOrBaseURL) ? chainOrBaseURL : (0, lodash_1.findKey)(base_urls_1.default, value => chainOrBaseURL.indexOf(value) === 0);
     const network = new ethers_1.Network(chain || 'unknown', Number(chain || 1));
     network.attachPlugin(new ethers_1.EtherscanPlugin(baseURL));
     const etherscanProvider = new ethers_1.EtherscanProvider(network, apiKey);
-    function get(module, query) {
+    const request = function (url) {
         return __awaiter(this, void 0, void 0, function* () {
-            const url = new whatwg_url_1.URL(`/api?${qs_1.default.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL);
-            var data = yield fetch(url.toString(), Object.assign({ debug: options.debug }));
+            var data = yield fetch(url);
             if (data.status && data.status !== types_1.Status.SUCCESS) {
                 let returnMessage = data.message || 'NOTOK';
                 if (returnMessage === 'No transactions found' || returnMessage === 'No records found') {
@@ -103,7 +106,49 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             }
             return data;
         });
-    }
+    };
+    const get = function (module, query) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const urlObj = new whatwg_url_1.URL(`/api?${qs_1.default.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL);
+            const url = urlObj.toString();
+            if (typeof options.retry === 'undefined') {
+                const data = yield request(url);
+                if (options.debug) {
+                    console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${url}`);
+                }
+                return data;
+            }
+            const operation = retry_1.default.operation(Object.assign({
+                minTimeout: 10000,
+                randomize: false
+            }, typeof options.retry === 'number' ? {
+                retries: options.retry || 0,
+            } : {
+                forever: true
+            }));
+            return new Promise((resolve, reject) => {
+                operation.attempt(function (attempt) {
+                    request(url.toString()).then((data) => {
+                        var _a;
+                        if (options === null || options === void 0 ? void 0 : options.debug) {
+                            console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${url}`);
+                        }
+                        resolve(data);
+                    }).catch(e => {
+                        var _a;
+                        if (operation.retry(e)) {
+                            if (options === null || options === void 0 ? void 0 : options.debug) {
+                                console.log(`${colors_1.default.yellow(`${(_a = node_emoji_1.default.find('❗️')) === null || _a === void 0 ? void 0 : _a.emoji}Retry ${attempt} times due to [${e.message}]: `)} ${url}`);
+                            }
+                            return;
+                        }
+                        reject(operation.mainError());
+                    });
+                });
+            });
+        });
+    };
     function getSourceCode(query) {
         return __awaiter(this, void 0, void 0, function* () {
             return get(types_2.Module.Contract, Object.assign({
@@ -420,7 +465,7 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { glob
             function loop() {
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!isStopped) {
-                        let response = yield fetchData(Object.assign({}, query, { offset }));
+                        let response = yield fetchData(Object.assign({ offset }, nextQuery));
                         accItemLength = accItemLength + response.result.length;
                         data.push(...response.result);
                         cb(response.result, index, data, false);
@@ -438,7 +483,10 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { glob
                                     nextQuery.endblock = endblock;
                                 }
                                 if (isStopped) {
-                                    break;
+                                    if (options.debug) {
+                                        console.log(`${colors_1.default.red('Stop')}`);
+                                    }
+                                    return;
                                 }
                                 response = yield fetchData(nextQuery);
                                 const last2000Data = data.slice(-offset);
@@ -454,7 +502,10 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { glob
                                 nextQuery = Object.assign(Object.assign({}, nextQuery), { page,
                                     offset });
                                 if (isStopped) {
-                                    break;
+                                    if (options.debug) {
+                                        console.log(`${colors_1.default.red('Stop')}`);
+                                    }
+                                    return;
                                 }
                                 response = yield fetchData(nextQuery);
                                 accItemLength = accItemLength + response.result.length;
@@ -467,6 +518,12 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { glob
                 });
             }
             function resume() {
+                if (!isStopped) {
+                    return;
+                }
+                if (options.debug) {
+                    console.log(`${colors_1.default.green('Resume')}`);
+                }
                 isStopped = false;
                 loop();
             }
@@ -475,7 +532,7 @@ function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { glob
                 return nextQuery;
             }
             if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
-                resume();
+                loop();
             }
             return { resume, stop };
         };

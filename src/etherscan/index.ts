@@ -47,11 +47,16 @@ import {
 export * from './types'
 import { URL } from 'whatwg-url'
 import baseURLs from './base-urls'
-import { CustomFetch, GetEtherCompatTxListResponse, Module, defaultCustomFetch } from '../types'
+import { CustomFetch, defaultCustomFetch } from '../utils'
+import { GetEtherCompatTxListResponse, Module } from '../types'
 import { omit, findKey } from 'lodash'
 import { BlockNumber } from './types'
 import BigNumber from 'bignumber.js'
 import ethers, { JsonFragment, EtherscanProvider, EtherscanPlugin, Network } from 'ethers'
+import { FetchCustomConfig } from '../utils'
+import retry from 'retry'
+import colors from 'colors'
+import nodeEmoji from 'node-emoji'
 
 const MAX_SIZE = 10000
 
@@ -81,7 +86,7 @@ function handleLogs(response: Data<GetLogsResponseFormat[]>): Data<GetLogsRespon
     return response
 }
 
-export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: { debug?: boolean } = { debug: false }) {
+export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: FetchCustomConfig = { debug: false, retry: 3 }) {
     const fetch = customFetch || defaultCustomFetch
     //@ts-ignore: TS7053
     const baseURL = Object.keys(baseURLs).includes(chainOrBaseURL) ? baseURLs[chainOrBaseURL] : chainOrBaseURL;
@@ -89,9 +94,9 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
     const network = new Network(chain || 'unknown', Number(chain || 1))
     network.attachPlugin(new EtherscanPlugin(baseURL))
     const etherscanProvider = new EtherscanProvider(network, apiKey);
-    async function get<T>(module: string, query: Record<string, any>) {
-        const url = new URL(`/api?${qs.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL)
-        var data: Data<T> = await fetch(url.toString(), Object.assign({ debug: options.debug }))
+
+    const request = async function <T>(url: string) {
+        var data: Data<T> = await fetch(url)
         if (data.status && data.status !== Status.SUCCESS) {
             let returnMessage: string = data.message || 'NOTOK';
             if (returnMessage === 'No transactions found' || returnMessage === 'No records found') {
@@ -112,6 +117,44 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
             throw message
         }
         return data
+    }
+
+    const get = async function <T>(module: string, query: Record<string, any>) {
+        const urlObj = new URL(`/api?${qs.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL)
+        const url = urlObj.toString()
+        if (typeof options.retry === 'undefined') {
+            const data = await request<T>(url)
+            if (options.debug) {
+                console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${url}`)
+            }
+            return data
+        }
+        const operation = retry.operation(Object.assign({
+            minTimeout: 10000,
+            randomize: false
+        }, typeof options.retry === 'number' ? {
+            retries: options.retry || 0,
+        } : {
+            forever: true
+        }))
+        return new Promise<Data<T>>((resolve, reject) => {
+            operation.attempt(function (attempt) {
+                request<T>(url.toString()).then((data) => {
+                    if (options?.debug) {
+                        console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${url}`)
+                    }
+                    resolve(data)
+                }).catch(e => {
+                    if (operation.retry(e)) {
+                        if (options?.debug) {
+                            console.log(`${colors.yellow(`${nodeEmoji.find('❗️')?.emoji}Retry ${attempt} times due to [${e.message}]: `)} ${url}`)
+                        }
+                        return;
+                    }
+                    reject(operation.mainError())
+                })
+            })
+        })
     }
 
     async function getSourceCode(query: GetContractSourceCodeQuery) {
@@ -399,7 +442,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
     }
 }
 
-export function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: { debug?: boolean, globalAutoStart?: boolean } = { globalAutoStart: true }) {
+export function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: { globalAutoStart?: boolean } & FetchCustomConfig = { globalAutoStart: true }) {
     const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch, options)
     function fetchPageData<Query, ResponseItem extends { blockNumber: string, logIndex?: string, hash: string }>(getData: (query: Query) => Promise<Data<ResponseItem[]>>) {
         return function (q: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
@@ -423,7 +466,7 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
 
             async function loop() {
                 if (!isStopped) {
-                    let response: Data<ResponseItem[]> = await fetchData(Object.assign({}, query, { offset }))
+                    let response: Data<ResponseItem[]> = await fetchData(Object.assign({ offset }, nextQuery))
                     accItemLength = accItemLength + response.result.length
                     data.push(...response.result)
                     cb(response.result, index, data, false)
@@ -444,7 +487,10 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                                 nextQuery.endblock = endblock
                             }
                             if (isStopped) {
-                                break;
+                                if (options.debug) {
+                                    console.log(`${colors.red('Stop')}`)
+                                }
+                                return
                             }
                             response = await fetchData(nextQuery)
                             const last2000Data = data.slice(-offset)
@@ -465,7 +511,10 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                                 offset
                             }
                             if (isStopped) {
-                                break;
+                                if (options.debug) {
+                                    console.log(`${colors.red('Stop')}`)
+                                }
+                                return
                             }
                             response = await fetchData(nextQuery)
                             accItemLength = accItemLength + response.result.length
@@ -478,6 +527,12 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
             }
 
             function resume() {
+                if (!isStopped) {
+                    return
+                }
+                if (options.debug) {
+                    console.log(`${colors.green('Resume')}`)
+                }
                 isStopped = false
                 loop()
             }
@@ -486,8 +541,9 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                 isStopped = true
                 return nextQuery
             }
+
             if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
-                resume()
+                loop()
             }
 
             return { resume, stop }

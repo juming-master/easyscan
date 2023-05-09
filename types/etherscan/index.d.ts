@@ -1,11 +1,11 @@
 import { Data, AccountTxListInternalResponse, AccountBalanceQuery, AccountBalanceResponse, AccountTokenBalanceQuery, AccountTxListInternalQuery, AccountTxListQuery, Sort, AccountMineBlocksQuery, AccountERC20TokenTransferEventQuery, AccountERC721TokenTransferEventQuery, AccountERC1155TokenTransferEventQuery, AccountMineBlocksResponse, AccountERC20TokenTransferEventResponse, AccountERC721TokenTransferEventResponse, AccountERC1155TokenTransferEventResponse, AccountHistoryBalanceOfEthQuery, GetLogsQuery, GetContractABIQuery, GetContractSourceCodeQuery, GetContractSourceCodeResponse, BlockCountdownQuery, BlockCountdownResponse, BlockNoByTimestampQuery, BlockRewardQuery, BlockRewardResponse, AccountTxListResponse, GetContractCreationQuery, GetContractCreationResponse, GetTransactionStatusQuery, GetTransactionStatusResponse, GetTransactionReceiptStatusQuery, GetTransactionReceiptStatusResponse, GetTokenBalanceQuery, GetContractSourceCodeFormatResponse, GetLogsResponseFormat } from './types';
 export * from './types';
-import { CustomFetch, GetEtherCompatTxListResponse } from '../types';
+import { CustomFetch } from '../utils';
+import { GetEtherCompatTxListResponse } from '../types';
 import { BlockNumber } from './types';
 import ethers from 'ethers';
-export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: {
-    debug?: boolean;
-}): {
+import { FetchCustomConfig } from '../utils';
+export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: FetchCustomConfig): {
     provider: ethers.ethers.EtherscanProvider;
     account: {
         /**
@@ -89,9 +89,8 @@ export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, cus
     };
 };
 export declare function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: {
-    debug?: boolean;
     globalAutoStart?: boolean;
-}): {
+} & FetchCustomConfig): {
     account: {
         txList: (q: AccountTxListQuery, cb: (currentPageData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], currentPageIndex: number, accumulatedData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], isFinish: boolean) => void, autoStart?: boolean) => {
             resume: () => void;

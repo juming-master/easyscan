@@ -16,11 +16,16 @@ exports.tronscanPageData = exports.tronscanAPI = void 0;
 const qs_1 = __importDefault(require("qs"));
 const whatwg_url_1 = require("whatwg-url");
 const types_1 = require("../types");
+const utils_1 = require("../utils");
 const base_urls_1 = __importDefault(require("./base-urls"));
 const omit_1 = __importDefault(require("lodash/omit"));
 const lodash_1 = require("lodash");
 const bignumber_js_1 = __importDefault(require("bignumber.js"));
 const tron_jsonrpc_provider_1 = __importDefault(require("./tron-jsonrpc-provider"));
+const defaultsDeep_1 = __importDefault(require("lodash/defaultsDeep"));
+const colors_1 = __importDefault(require("colors"));
+const node_emoji_1 = __importDefault(require("node-emoji"));
+const retry_1 = __importDefault(require("retry"));
 function handleTxList(response) {
     const data = response.data.map(el => {
         const value = el.raw_data.contract[0].parameter.value;
@@ -58,8 +63,8 @@ function handleLogs(response) {
     });
     return Object.assign(Object.assign({}, response), { data });
 }
-function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false, debug: false }) {
-    const fetch = customFetch || types_1.defaultCustomFetch;
+function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false }) {
+    const fetch = customFetch || utils_1.defaultCustomFetch;
     // @ts-ignore: TS7053
     const baseURL = Object.keys(base_urls_1.default).includes(chainOrBaseURL) ? base_urls_1.default[chainOrBaseURL] : chainOrBaseURL;
     const chain = Object.keys(base_urls_1.default).includes(chainOrBaseURL) ? chainOrBaseURL : (0, lodash_1.findKey)(base_urls_1.default, value => chainOrBaseURL.indexOf(value) === 0);
@@ -71,7 +76,7 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
                 url.search = qs_1.default.stringify((0, lodash_1.mapKeys)(query, (_, key) => (0, lodash_1.snakeCase)(key)));
             }
             try {
-                var data = yield fetch(url.toString(), Object.assign({ debug: options.debug }, apiKey ? {
+                var data = yield fetch(url.toString(), Object.assign({}, apiKey ? {
                     headers: {
                         TRON_PRO_API_KEY: apiKey,
                         'Content-Type': 'application/json'
@@ -81,10 +86,17 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
                     let returnMessage = data.error || 'NOTOK';
                     throw new Error(returnMessage);
                 }
-                return data;
+                return (0, defaultsDeep_1.default)(data, {
+                    meta: {
+                        links: {
+                            current: url.toString()
+                        }
+                    }
+                });
             }
             catch (e) {
-                debugger;
+                // @ts-ignore
+                e.url = url.toString();
                 throw e;
             }
         });
@@ -151,41 +163,96 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
 }
 exports.tronscanAPI = tronscanAPI;
 function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globalAutoStart: true }) {
-    const fetch = customFetch || types_1.defaultCustomFetch;
+    const fetch = customFetch || utils_1.defaultCustomFetch;
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options);
+    const operation = retry_1.default.operation(Object.assign({
+        minTimeout: 10000,
+        maxTimeout: 30000,
+        randomize: false
+    }, typeof options.retry === 'number' ? {
+        retries: options.retry || 0,
+    } : {
+        forever: true
+    }));
     function fetchPageData(getData) {
         return function (query, cb, autoStart) {
             const data = [];
             let nextLink = '';
+            let currentLink = '';
             let isStopped = false;
             let index = 0;
-            function fetchData(query) {
+            const request = function (query) {
+                var _a, _b;
                 return __awaiter(this, void 0, void 0, function* () {
-                    let data;
-                    if (!nextLink) {
-                        data = yield getData(Object.assign({}, query));
+                    try {
+                        let data;
+                        if (!nextLink) {
+                            data = yield getData(Object.assign({}, query));
+                            currentLink = ((_a = data.meta.links) === null || _a === void 0 ? void 0 : _a.current) || '';
+                        }
+                        else {
+                            data = yield fetch(nextLink, options);
+                            currentLink = nextLink || '';
+                        }
+                        index++;
+                        nextLink = ((_b = data.meta.links) === null || _b === void 0 ? void 0 : _b.next) || '';
+                        return data;
                     }
-                    else {
-                        data = yield fetch(nextLink, options);
+                    catch (e) {
+                        // @ts-ignore
+                        currentLink = e.url;
+                        nextLink = '';
+                        throw e;
                     }
-                    index++;
-                    return data;
                 });
-            }
-            function loop() {
+            };
+            const get = function (query) {
                 var _a;
                 return __awaiter(this, void 0, void 0, function* () {
+                    if (typeof options.retry === 'undefined') {
+                        const data = yield request(query);
+                        if (options.debug) {
+                            console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${currentLink}`);
+                        }
+                        return data;
+                    }
+                    return new Promise((resolve, reject) => {
+                        operation.attempt(function (attempt) {
+                            request(query).then((data) => {
+                                var _a;
+                                if (options === null || options === void 0 ? void 0 : options.debug) {
+                                    console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${currentLink}`);
+                                }
+                                resolve(data);
+                            }).catch(e => {
+                                var _a;
+                                if (operation.retry(e)) {
+                                    if (options === null || options === void 0 ? void 0 : options.debug) {
+                                        console.log(`${colors_1.default.yellow(`${(_a = node_emoji_1.default.find('❗️')) === null || _a === void 0 ? void 0 : _a.emoji}Retry ${attempt} times due to [${e.message}]: `)} ${currentLink}`);
+                                    }
+                                    return;
+                                }
+                                reject(operation.mainError());
+                            });
+                        });
+                    });
+                });
+            };
+            function loop() {
+                return __awaiter(this, void 0, void 0, function* () {
                     if (!isStopped) {
-                        let response = yield fetchData(query);
+                        let response = yield get(query);
                         while (response && response.success && response.data.length > 0) {
                             data.push(...response.data);
                             cb(response.data, index, data, false);
-                            if ((_a = response.meta.links) === null || _a === void 0 ? void 0 : _a.next) {
-                                nextLink = response.meta.links.next;
+                            if (nextLink) {
                                 if (isStopped) {
-                                    break;
+                                    if (options.debug) {
+                                        console.log(`${colors_1.default.red('Stop')}`);
+                                    }
+                                    return;
                                 }
-                                response = yield fetchData(query);
+                                response = yield get(query);
                             }
                             else {
                                 response = null;
@@ -196,15 +263,21 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                 });
             }
             function resume() {
+                if (!isStopped) {
+                    return;
+                }
+                if (options.debug) {
+                    console.log(`${colors_1.default.green('Resume')}`);
+                }
                 isStopped = false;
                 loop();
             }
             function stop() {
                 isStopped = true;
-                return nextLink || query;
+                return nextLink || currentLink;
             }
             if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
-                resume();
+                loop();
             }
             return { resume, stop };
         };

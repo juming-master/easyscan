@@ -1,4 +1,4 @@
-import { CustomFetch } from "../types";
+import { CustomFetch } from '../utils';
 import etherscanBaseURLs from '../etherscan/base-urls';
 import tronNodes from '../tronscan/base-urls';
 import { GetAccountBalanceQuery, GetAccountBalanceResponse } from "./types";
