@@ -411,6 +411,7 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
             let isStopped = false
             let index = 0
             let page = query.page
+            const offset = query.offset || 10000
             let accItemLength = 0
             let nextQuery = query
 
@@ -422,9 +423,9 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
 
             async function loop() {
                 if (!isStopped) {
-                    let response: Data<ResponseItem[]> | null = await fetchData(query)
+                    let response: Data<ResponseItem[]> | null = await fetchData(Object.assign({}, query, { offset }))
                     accItemLength = accItemLength + response.result.length
-                    while (response && response.status === '1' && response.result.length > 0) {
+                    while (response && response.status === '1' && response.result.length === offset) {
                         data.push(...response.result)
                         cb(response.result, index, data, false)
                         if (accItemLength >= MAX_SIZE) {
@@ -433,9 +434,14 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                             page = 1
                             nextQuery = {
                                 ...nextQuery,
-                                startblock: startblock,
-                                endblock: endblock,
-                                page
+                                page,
+                                offset
+                            }
+                            if (startblock !== undefined) {
+                                nextQuery.startblock = startblock
+                            }
+                            if (endblock !== undefined) {
+                                nextQuery.endblock = endblock
                             }
                             if (isStopped) {
                                 break;
@@ -449,17 +455,24 @@ export function etherscanPageData(chainOrBaseURL: string, apiKey: string, custom
                                 })
                             }
                             accItemLength = res.result.length
+                            if (res.result.length < offset) {
+                                break
+                            }
                         } else {
                             page++
                             nextQuery = {
                                 ...nextQuery,
-                                page
+                                page,
+                                offset
                             }
                             if (isStopped) {
                                 break;
                             }
                             response = await fetchData(nextQuery)
                             accItemLength = accItemLength + response.result.length
+                            if (response.result.length < offset) {
+                                break
+                            }
                         }
                     }
                     cb([], index, data, true)

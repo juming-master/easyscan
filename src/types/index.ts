@@ -5,6 +5,7 @@ export interface CustomFetch {
 }
 
 export async function defaultCustomFetch<Data>(url: string, config?: AxiosRequestConfig<any>) {
+    // console.log(url)
     const response = await axios.get(url, {
         responseType: 'json',
         ...config
