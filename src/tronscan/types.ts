@@ -29,16 +29,20 @@ interface OnlyConfirmQuery {
 }
 
 export enum BlockTimestampSort {
-    asc = 'block_timestamp,asc',
-    desc = 'block_timestamp,desc',
+    ASC = 'block_timestamp,asc',
+    DESC = 'block_timestamp,desc',
 }
 
-type PageQuery<T> = (T & {
+export interface TronPageQuery {
     limit?: number,
     orderBy?: BlockTimestampSort,
     minTimestamp?: number,
     maxTimestamp?: number
-})
+}
+
+export interface PageResponse {
+    
+}
 
 
 export type GetTronAccountInfoQuery = OnlyConfirmQuery & {
@@ -51,12 +55,12 @@ export interface GetTronAccountInfoResponseOrigin {
     create_time: number,
 }
 
-export type GetTronAccountTxListQuery = PageQuery<OnlyConfirmQuery & {
+export type GetTronAccountTxListQuery = TronPageQuery & OnlyConfirmQuery & {
     address: TronBase58String,
     onlyFrom?: boolean,
     onlyTo?: boolean,
     searchInternal?: boolean
-}>
+}
 
 
 export interface GetTronAccountTxListResponse {
@@ -155,13 +159,13 @@ export interface GetTronAccountTxListResponse {
     "internal_transactions": []
 }
 
-export type GetTronAccountTokenTransferQuery = PageQuery<OnlyConfirmQuery & {
+export type GetTronAccountTokenTransferQuery = TronPageQuery & OnlyConfirmQuery & {
     address: TronBase58String,
     onlyFrom?: boolean,
     onlyTo?: boolean,
     searchInternal?: boolean,
     contractAddress: string
-}>
+}
 
 export interface GetTronAccountTokenTransferResponse {
     transaction_id: string,
@@ -191,11 +195,11 @@ export interface GetTronTokenBalanceResponse {
 export type GetTronTransactionLogsQuery = {
     txId: string
 }
-export type GetTronContractLogsQuery = PageQuery<{
+export type GetTronContractLogsQuery = TronPageQuery & {
     address: string,
     eventName?: string,
     blockNumber?: number,
-}>
+}
 export type GetTronBlockLogsQuery = {
     blockNumber: number | 'latest',
     limit?: number

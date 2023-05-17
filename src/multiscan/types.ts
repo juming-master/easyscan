@@ -1,4 +1,5 @@
-import { BlockNumber } from "../etherscan"
+import { BlockNumber } from "../types"
+
 
 export interface GetAccountBalanceQuery {
     address: string | string[]

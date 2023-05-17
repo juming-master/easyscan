@@ -1,11 +1,12 @@
 import qs from 'qs'
 import { URL } from 'whatwg-url'
-import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery } from './types'
+import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery, BlockTimestampSort, TronPageQuery } from './types'
 import { GetEtherCompatTxListResponse, Module } from '../types'
-import { CustomFetch, FetchCustomConfig, defaultCustomFetch } from '../utils'
+import { defaultCustomFetch } from '../utils'
+import { CustomFetch, FetchCustomConfig } from '../types'
 import baseURLs from './base-urls'
 import omit from 'lodash/omit'
-import { findKey, mapKeys, snakeCase } from 'lodash'
+import { findKey, last, mapKeys, snakeCase } from 'lodash'
 import BigNumber from 'bignumber.js'
 import TronProvider from './tron-jsonrpc-provider'
 import defaultsDeep from 'lodash/defaultsDeep'
@@ -13,7 +14,7 @@ import colors from 'colors'
 import nodeEmoji from 'node-emoji'
 import retry from 'retry'
 
-function handleTxList(response: TronData<GetTronAccountTxListResponse[]>): TronData<GetEtherCompatTxListResponse[]> {
+export function formatToEtherscanTxs(response: TronData<GetTronAccountTxListResponse[]>): TronData<GetEtherCompatTxListResponse[]> {
     const data = response.data.map(el => {
         const value = el.raw_data.contract[0].parameter.value
         // @ts-ignore
@@ -38,7 +39,7 @@ function handleTxList(response: TronData<GetTronAccountTxListResponse[]>): TronD
     }
 }
 
-function handleLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEtherCompatLogsResponse[]> {
+export function formatToEtherscanLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEtherCompatLogsResponse[]> {
     const data = response.data.map(el => {
         return {
             address: el.contract_address,
@@ -74,7 +75,7 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
         try {
             var data: TronData<T> = await fetch(url.toString(), Object.assign({}, apiKey ? {
                 headers: {
-                    TRON_PRO_API_KEY: apiKey,
+                    'TRON_PRO_API_KEY': apiKey,
                     'Content-Type': 'application/json'
                 }
             } : undefined))
@@ -106,11 +107,8 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
             accountInfo: function (query: GetTronAccountInfoQuery) {
                 return handleResponse(get<GetTronAccountInfoResponseOrigin>(['accounts', query.address], omit(query, ['address'])))
             },
-            txList: async function (query: GetTronAccountTxListQuery): Promise<TronData<(GetTronAccountTxListResponse | GetEtherCompatTxListResponse)[]>> {
+            txList: async function (query: GetTronAccountTxListQuery): Promise<TronData<GetTronAccountTxListResponse[]>> {
                 const result = await get<GetTronAccountTxListResponse[]>(['accounts', query.address, 'transactions'], omit(query, ['address']))
-                if (options.dataCompatible) {
-                    return handleTxList(result)
-                }
                 return result
             },
             tokenTransfer: function (query: GetTronAccountTokenTransferQuery) {
@@ -118,11 +116,8 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
             }
         },
         [Module.Contract]: {
-            txList: async function (query: GetTronAccountTxListQuery): Promise<TronData<(GetTronAccountTxListResponse | GetEtherCompatTxListResponse)[]>> {
+            txList: async function (query: GetTronAccountTxListQuery): Promise<TronData<GetTronAccountTxListResponse[]>> {
                 const result = await get<GetTronAccountTxListResponse[]>(['contracts', query.address, 'transactions'], omit(query, ['address']))
-                if (options.dataCompatible) {
-                    return handleTxList(result)
-                }
                 return result
             },
             tokenBalance: function (query: GetTronTokenBalanceQuery) {
@@ -130,17 +125,17 @@ export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch
             }
         },
         [Module.Logs]: {
-            txLogs: async function (query: GetTronTransactionLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
+            txLogs: async function (query: GetTronTransactionLogsQuery): Promise<TronData<GetTronLogsResponse[]>> {
                 const result = await get<GetTronLogsResponse[]>(['transactions', query.txId, 'events'], omit(query, 'txId'))
-                return handleLogs(result)
+                return result
             },
-            contractLogs: async function (query: GetTronContractLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
+            contractLogs: async function (query: GetTronContractLogsQuery): Promise<TronData<GetTronLogsResponse[]>> {
                 const result = await get<GetTronLogsResponse[]>(['contracts', query.address, 'events'], omit(query, 'address'))
-                return handleLogs(result)
+                return result
             },
-            blockLogs: async function (query: GetTronBlockLogsQuery): Promise<TronData<(GetEtherCompatLogsResponse)[]>> {
+            blockLogs: async function (query: GetTronBlockLogsQuery): Promise<TronData<GetTronLogsResponse[]>> {
                 const result = await get<GetTronLogsResponse[]>(['blocks', query.blockNumber + '', 'events'], omit(query, 'blockNumber'))
-                return handleLogs(result)
+                return result
             }
         }
     }
@@ -160,20 +155,20 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
     } : {
         retries: retries,
     }))
-    function fetchPageData<Query, ResponseItem>(getData: (query: Query) => Promise<TronData<ResponseItem[]>>) {
+    function fetchPageData<Query extends TronPageQuery, ResponseItem>(getData: (query: Query) => Promise<TronData<ResponseItem[]>>, matchFields?: (item: ResponseItem) => { blockTimestamp: number, blockNumber?: number, hash: string, logIndex?: number }) {
         return function (query: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
             const data: ResponseItem[] = []
             let nextLink = ''
             let currentLink = ''
             let isStopped = false
             let index = 0
+            let nextQuery = query
 
-
-            const request = async function (query: Query) {
+            const request = async function (): Promise<TronData<ResponseItem[]>> {
                 try {
                     let data: TronData<ResponseItem[]>
                     if (!nextLink) {
-                        data = await getData({ ...query })
+                        data = await getData({ ...nextQuery })
                         currentLink = data.meta.links?.current || ''
                     } else {
                         data = await fetch(nextLink, options)
@@ -183,14 +178,40 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                     nextLink = data.meta.links?.next || ''
                     return data
                 } catch (e) {
-                    // @ts-ignore
+                    debugger
+                    //@ts-ignore
+                    if (e?.response?.data?.statusCode === 400 && matchFields) {
+                        const { blockTimestamp } = matchFields(last(data)!)
+                        const maxTimestamp = (query.orderBy === BlockTimestampSort.DESC || !query.orderBy) ? Number(blockTimestamp) : query.maxTimestamp
+                        const minTimestamp = query.orderBy === BlockTimestampSort.ASC ? Number(blockTimestamp) : query.minTimestamp
+                        if (maxTimestamp !== undefined) {
+                            nextQuery.maxTimestamp = maxTimestamp
+                        }
+                        if (minTimestamp !== undefined) {
+                            nextQuery.minTimestamp = minTimestamp
+                        }
+                        nextLink = ''
+                        currentLink = ''
+                        let response = await request()
+                        const last2000Data = data.slice(-2000)
+                        const uniqResponseData = (response?.data || []).filter(el => {
+                            const { blockTimestamp, blockNumber, hash, logIndex } = matchFields(el)
+                            return !last2000Data.find(dataItem => {
+                                const item = matchFields(dataItem)
+                                return item.blockNumber === blockNumber && item.blockTimestamp === blockTimestamp && item.hash === hash && item.logIndex === logIndex
+                            })
+                        })
+                        return Object.assign({}, response, {
+                            data: uniqResponseData
+                        })
+                    }
                     throw e
                 }
             }
 
-            const get = async function (query: Query) {
+            const get = async function () {
                 if (retries === 0) {
-                    const data = await request(query)
+                    const data = await request()
                     if (options.debug) {
                         console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${currentLink}`)
                     }
@@ -198,7 +219,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                 }
                 return new Promise<TronData<ResponseItem[]>>((resolve, reject) => {
                     operation.attempt(function (attempt) {
-                        request(query).then((data) => {
+                        request().then((data) => {
                             if (options?.debug) {
                                 console.log(`${colors.green(`${nodeEmoji.find('✅')?.emoji}`)} ${currentLink}`)
                             }
@@ -219,7 +240,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
 
             async function loop() {
                 if (!isStopped) {
-                    let response: TronData<ResponseItem[]> | null = await get(query)
+                    let response: TronData<ResponseItem[]> | null = await get()
                     while (response && response.success && response.data.length > 0) {
                         data.push(...response.data)
                         cb(response.data, index, data, false)
@@ -230,7 +251,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                                 }
                                 return;
                             }
-                            response = await get(query)
+                            response = await get()
                         } else {
                             response = null
                         }
@@ -267,17 +288,49 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
         [Module.Provider]: tronscan.provider,
         [Module.Account]: {
             accountInfo: tronscan.account.accountInfo,
-            txList: fetchPageData(tronscan.account.txList),
-            tokenTransfer: fetchPageData(tronscan.account.tokenTransfer)
+            txList: fetchPageData(tronscan.account.txList, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.blockNumber,
+                    hash: item.txID
+                }
+            }),
+            tokenTransfer: fetchPageData(tronscan.account.tokenTransfer, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    hash: item.transaction_id
+                }
+            })
         },
         [Module.Contract]: {
             tokenBalance: fetchPageData(tronscan.contract.tokenBalance),
-            txList: fetchPageData(tronscan.contract.txList)
+            txList: fetchPageData(tronscan.contract.txList, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.blockNumber,
+                    hash: item.txID
+                }
+            })
         },
         [Module.Logs]: {
+            // @ts-ignore
             txLogs: fetchPageData(tronscan.logs.txLogs),
-            contractLogs: fetchPageData(tronscan.logs.contractLogs),
-            blockLogs: fetchPageData(tronscan.logs.blockLogs),
+            contractLogs: fetchPageData(tronscan.logs.contractLogs, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.block_number,
+                    hash: item.transaction_id,
+                    logIndex: item.event_index
+                }
+            }),
+            blockLogs: fetchPageData(tronscan.logs.blockLogs, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.block_number,
+                    hash: item.transaction_id,
+                    logIndex: item.event_index
+                }
+            }),
         }
     }
 }

@@ -1,5 +1,4 @@
-import { Module } from "../types";
-import { CustomFetch } from '../utils'
+import { CustomFetch, Module } from "../types";
 import etherscanBaseURLs from '../etherscan/base-urls'
 import tronNodes from '../tronscan/base-urls'
 import etherscanAPI from '../etherscan'

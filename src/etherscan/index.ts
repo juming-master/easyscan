@@ -1,7 +1,8 @@
 import qs from 'qs'
 import {
-    Data,
-    Status,
+    fetchOffsetPageData,
+} from '../utils/page-query'
+import {
     AccountTxListInternalResponse,
     AccountBalanceQuery,
     AccountBalanceResponse,
@@ -9,7 +10,6 @@ import {
     AccountTokenBalanceResponse,
     AccountTxListInternalQuery,
     AccountTxListQuery,
-    Sort,
     AccountMineBlocksQuery,
     AccountERC20TokenTransferEventQuery,
     AccountERC721TokenTransferEventQuery,
@@ -42,18 +42,17 @@ import {
     GetTokenBalanceQuery,
     GetTokenBalanceResponse,
     GetContractSourceCodeFormatResponse,
-    GetLogsResponseFormat
+    GetLogsResponseFormat,
+    PageQuery
 } from './types'
 export * from './types'
 import { URL } from 'whatwg-url'
 import baseURLs from './base-urls'
-import { CustomFetch, defaultCustomFetch } from '../utils'
-import { GetEtherCompatTxListResponse, Module } from '../types'
+import { defaultCustomFetch } from '../utils'
+import { CustomFetch, Data, FetchCustomConfig, GetEtherCompatTxListResponse, Module, Sort, Status } from '../types'
 import { omit, findKey } from 'lodash'
-import { BlockNumber } from './types'
 import BigNumber from 'bignumber.js'
 import ethers, { JsonFragment, EtherscanProvider, EtherscanPlugin, Network } from 'ethers'
-import { FetchCustomConfig } from '../utils'
 import retry from 'retry'
 import colors from 'colors'
 import nodeEmoji from 'node-emoji'
@@ -80,10 +79,6 @@ function handleTxList(response: Data<AccountTxListResponse[]>): Data<GetEtherCom
         ...response,
         result
     }
-}
-
-function handleLogs(response: Data<GetLogsResponseFormat[]>): Data<GetLogsResponseFormat[]> {
-    return response
 }
 
 export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: FetchCustomConfig = { debug: false, retry: 3 }) {
@@ -364,14 +359,20 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
                * The Event Log API was designed to provide an alternative to the native eth_getLogs.
                */
             getLogs: async function (query: GetLogsQuery): Promise<Data<(GetLogsResponseFormat)[]>> {
-                const result = await get<GetLogsResponse[]>(Module.Logs, Object.assign({
-                    action: 'getLogs',
-                    fromBlock: typeof query.startblock === 'undefined' ? 0 : query.startblock,
-                    toBlock: typeof query.endblock === 'undefined' ? 'latest' : query.endblock,
-                }, omit(query, 'compatable'))).then(response => ({
-                    ...response,
-                    result: response.result.map(el => ({ ...omit(el, 'transactionHash'), hash: el.transactionHash }))
-                }));
+                const result = await get<GetLogsResponse[]>(Module.Logs, Object.assign(
+                    {
+                        action: 'getLogs',
+                        sort: Sort.ASC
+                    },
+                    omit(query, 'compatable', 'startblock', 'endblock'),
+                    {
+
+                        fromBlock: typeof query.startblock === 'undefined' ? 0 : query.startblock,
+                        toBlock: typeof query.endblock === 'undefined' ? 'latest' : query.endblock,
+                    })).then(response => ({
+                        ...response,
+                        result: response.result.map(el => ({ ...omit(el, 'transactionHash'), hash: el.transactionHash }))
+                    }));
                 return result
             }
         },
@@ -445,110 +446,38 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
 
 export function etherscanPageData(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options: { globalAutoStart?: boolean } & FetchCustomConfig = { globalAutoStart: true }) {
     const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch, options)
-    function fetchPageData<Query, ResponseItem extends { blockNumber: string, logIndex?: string, hash: string }>(getData: (query: Query) => Promise<Data<ResponseItem[]>>) {
-        return function (q: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
-            const query = q as { page: number, offset: number, sort: Sort, startblock?: BlockNumber, endblock?: BlockNumber }
-            if (query.offset * query.page > MAX_SIZE) {
-                throw new Error(`page * offset should be less than ${MAX_SIZE}`)
-            }
-            const data: ResponseItem[] = []
-            let isStopped = false
-            let index = 0
-            let page = query.page
-            const offset = query.offset || 10000
-            let accItemLength = 0
-            let nextQuery = query
 
-            async function fetchData(query: any) {
-                let data: Data<ResponseItem[]> = await getData(query)
-                index++
-                return data
-            }
-
-            async function loop() {
-                if (!isStopped) {
-                    let response: Data<ResponseItem[]> = await fetchData(Object.assign({ offset }, nextQuery))
-                    accItemLength = accItemLength + response.result.length
-                    data.push(...response.result)
-                    cb(response.result, index, data, false)
-                    while (response.result.length === offset) {
-                        if (accItemLength + offset > MAX_SIZE) {
-                            const startblock = (query.sort === Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock
-                            const endblock = query.sort === Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock
-                            page = 1
-                            nextQuery = {
-                                ...nextQuery,
-                                page,
-                                offset
-                            }
-                            if (startblock !== undefined) {
-                                nextQuery.startblock = startblock
-                            }
-                            if (endblock !== undefined) {
-                                nextQuery.endblock = endblock
-                            }
-                            if (isStopped) {
-                                if (options.debug) {
-                                    console.log(`${colors.red('Stop')}`)
-                                }
-                                return
-                            }
-                            response = await fetchData(nextQuery)
-                            const last2000Data = data.slice(-offset)
-                            const uniqResponse = {
-                                ...response,
-                                result: response.result.filter(el => {
-                                    return !last2000Data.find(item => item.blockNumber === el.blockNumber && item.hash === el.hash && item.logIndex === el.logIndex)
-                                })
-                            }
-                            accItemLength = response.result.length
-                            data.push(...uniqResponse.result)
-                            cb(uniqResponse.result, index, data, false)
-                        } else {
-                            page++
-                            nextQuery = {
-                                ...nextQuery,
-                                page,
-                                offset
-                            }
-                            if (isStopped) {
-                                if (options.debug) {
-                                    console.log(`${colors.red('Stop')}`)
-                                }
-                                return
-                            }
-                            response = await fetchData(nextQuery)
-                            accItemLength = accItemLength + response.result.length
-                            data.push(...response.result)
-                            cb(response.result, index, data, false)
-                        }
+    function fetchPageData<Args extends PageQuery, ResponseItem extends { blockNumber: string, logIndex?: string, hash: string }>(getData: (query: Args) => Promise<Data<ResponseItem[]>>) {
+        return fetchOffsetPageData(
+            {
+                getData,
+                // parse the original parameters to fetchPageData parameters.
+                parseArgs: (args) => {
+                    return {
+                        ...omit(args, 'startblock', 'endblock', 'page', 'offset', 'sort'),
+                        start: args.startblock,
+                        end: args.endblock,
+                        page: args.page,
+                        limit: args.offset,
+                        sort: args.sort
                     }
-                    cb([], index, data, true)
-                }
+                },
+                // format the fetchPageData parameters to original parameters.
+                formatArgs: (args) => {
+                    return {
+                        ...omit(args, 'start', 'end', 'page', 'limit', 'sort'),
+                        startblock: args.start,
+                        endblock: args.end,
+                        page: args.page,
+                        offset: args.limit,
+                        sort: args.sort
+                    } as Args
+                },
+                checkBlock: (item) => Number(item.blockNumber),
+                isEqualItem: (a, b) => a.blockNumber === b.blockNumber && a.hash === b.hash && a.logIndex === b.logIndex,
+                options: { maxSize: MAX_SIZE, ...options }
             }
-
-            function resume() {
-                if (!isStopped) {
-                    return
-                }
-                if (options.debug) {
-                    console.log(`${colors.green('Resume')}`)
-                }
-                isStopped = false
-                loop()
-            }
-
-            function stop() {
-                isStopped = true
-                return nextQuery
-            }
-
-            if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
-                loop()
-            }
-
-            return { resume, stop }
-        }
+        )
     }
 
     return {

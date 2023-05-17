@@ -75,3 +75,8 @@ async function tronscanAPIDemo() {
     //     "type": 0
     // }
 ```
+
+## etherscan cli
+```shell
+etherscan getlogs --address=0x..... --startblock=0 --endblock=latest --topic0=0x.... --apikey=xxxx 
+```
