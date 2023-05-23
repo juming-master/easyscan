@@ -117,7 +117,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
     const get = async function <T>(module: string, query: Record<string, any>) {
         const urlObj = new URL(`/api?${qs.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL)
         const url = urlObj.toString()
-        const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3)
+        const retries = typeof options.retry === 'string' ? options.retry : (typeof options.retry === 'number' ? options.retry : 3)
         if (retries === 0) {
             const data = await request<T>(url)
             if (options.debug) {

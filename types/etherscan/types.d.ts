@@ -1,17 +1,10 @@
 import { JsonFragment } from 'ethers';
 import { GetEtherCompatQuery } from '../types';
+import { Data, Sort, BlockNumber } from '../types';
 export interface HttpClient<T> {
     get: {
         (query: string): Promise<T>;
     };
-}
-export declare enum Status {
-    SUCCESS = "1",
-    ERROR = "0"
-}
-export declare enum Sort {
-    ASC = "asc",
-    DESC = "desc"
 }
 export declare enum TokenType {
     ERC20 = "ERC20",
@@ -24,13 +17,6 @@ export interface ERC20 {
     name: string;
     decimals: number;
 }
-export type BlockNumber = number | 'latest';
-export interface Data<T> {
-    status: Status;
-    message: "OK" | "NOTOK";
-    result: T;
-    error?: Error | string;
-}
 export interface GetRequest {
     <T>(query: object): Promise<Data<T>>;
 }
@@ -38,6 +24,13 @@ export interface QueryRequired {
     module: string;
     action: string;
     apiKey: string;
+}
+export interface PageQuery {
+    startblock?: BlockNumber;
+    endblock?: BlockNumber;
+    page?: number;
+    offset?: number;
+    sort?: Sort;
 }
 /**************************************** Account ******************************************/
 export type AccountTokenBalanceQuery = {
@@ -55,13 +48,8 @@ export type AccountBalanceResponse<T = AccountBalanceQuery['address']> = T exten
     account: string;
     balance: string;
 }[];
-export type AccountTxListInternalQueryByAddress = {
+export type AccountTxListInternalQueryByAddress = PageQuery & {
     address?: string;
-    startblock?: BlockNumber;
-    endblock?: BlockNumber;
-    page: number;
-    offset: number;
-    sort?: Sort;
 };
 export type AccountTxListInternalQuery = {
     txhash: string;
@@ -82,13 +70,8 @@ export type AccountTxListInternalResponse = {
     isError: string;
     errCode: string;
 };
-export type AccountTxListQuery = {
+export type AccountTxListQuery = PageQuery & {
     address?: string;
-    startblock?: BlockNumber;
-    endblock?: BlockNumber;
-    page: number;
-    offset: number;
-    sort?: Sort;
 } & GetEtherCompatQuery;
 export type AccountTxListResponse = {
     blockNumber: string;
@@ -126,13 +109,7 @@ type TokenTransferEventQuery = {
     contractaddress?: string;
     address?: string;
 };
-export type AccountERC20TokenTransferEventQuery = TokenTransferEventQuery & {
-    page: number;
-    offset: number;
-    startblock?: BlockNumber;
-    endblock?: BlockNumber;
-    sort?: Sort;
-};
+export type AccountERC20TokenTransferEventQuery = PageQuery & TokenTransferEventQuery;
 export type AccountERC20TokenTransferEventResponse = {
     blockNumber: string;
     timeStamp: string;
@@ -154,13 +131,7 @@ export type AccountERC20TokenTransferEventResponse = {
     input: "deprecated";
     confirmations: string;
 };
-export type AccountERC721TokenTransferEventQuery = TokenTransferEventQuery & {
-    page: number;
-    offset: number;
-    startblock?: BlockNumber;
-    endblock?: BlockNumber;
-    sort?: Sort;
-};
+export type AccountERC721TokenTransferEventQuery = PageQuery & TokenTransferEventQuery;
 export type AccountERC721TokenTransferEventResponse = {
     blockNumber: string;
     timeStamp: string;
@@ -182,13 +153,7 @@ export type AccountERC721TokenTransferEventResponse = {
     input: string;
     confirmations: string;
 };
-export type AccountERC1155TokenTransferEventQuery = TokenTransferEventQuery & {
-    page: number;
-    offset: number;
-    startblock?: BlockNumber;
-    endblock?: BlockNumber;
-    sort?: Sort;
-};
+export type AccountERC1155TokenTransferEventQuery = PageQuery & TokenTransferEventQuery;
 export type AccountERC1155TokenTransferEventResponse = {
     blockNumber: string;
     timeStamp: string;
@@ -246,10 +211,8 @@ export type BlockNoByTimestampQuery = {
 };
 export type BlockNoByTimestampResponse = string;
 /**************************************** Logs ******************************************/
-export type GetLogsQuery = {
+export type GetLogsQuery = Omit<PageQuery, 'sort'> & {
     address?: string;
-    startblock?: BlockNumber;
-    endblock?: BlockNumber;
     topic0?: string;
     topic1?: string;
     topic2?: string;
@@ -260,8 +223,6 @@ export type GetLogsQuery = {
     topic1_2_opr?: 'and' | 'or';
     topic1_3_opr?: 'and' | 'or';
     topic2_3_opr?: 'and' | 'or';
-    page: number;
-    offset: number;
 } & GetEtherCompatQuery;
 export type GetLogsResponse = {
     address: string;

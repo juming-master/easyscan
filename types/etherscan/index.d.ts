@@ -1,10 +1,7 @@
-import { Data, AccountTxListInternalResponse, AccountBalanceQuery, AccountBalanceResponse, AccountTokenBalanceQuery, AccountTxListInternalQuery, AccountTxListQuery, Sort, AccountMineBlocksQuery, AccountERC20TokenTransferEventQuery, AccountERC721TokenTransferEventQuery, AccountERC1155TokenTransferEventQuery, AccountMineBlocksResponse, AccountERC20TokenTransferEventResponse, AccountERC721TokenTransferEventResponse, AccountERC1155TokenTransferEventResponse, AccountHistoryBalanceOfEthQuery, GetLogsQuery, GetContractABIQuery, GetContractSourceCodeQuery, GetContractSourceCodeResponse, BlockCountdownQuery, BlockCountdownResponse, BlockNoByTimestampQuery, BlockRewardQuery, BlockRewardResponse, AccountTxListResponse, GetContractCreationQuery, GetContractCreationResponse, GetTransactionStatusQuery, GetTransactionStatusResponse, GetTransactionReceiptStatusQuery, GetTransactionReceiptStatusResponse, GetTokenBalanceQuery, GetContractSourceCodeFormatResponse, GetLogsResponseFormat } from './types';
+import { AccountTxListInternalResponse, AccountBalanceQuery, AccountBalanceResponse, AccountTokenBalanceQuery, AccountTxListInternalQuery, AccountTxListQuery, AccountMineBlocksQuery, AccountERC20TokenTransferEventQuery, AccountERC721TokenTransferEventQuery, AccountERC1155TokenTransferEventQuery, AccountMineBlocksResponse, AccountERC20TokenTransferEventResponse, AccountERC721TokenTransferEventResponse, AccountERC1155TokenTransferEventResponse, AccountHistoryBalanceOfEthQuery, GetLogsQuery, GetContractABIQuery, GetContractSourceCodeQuery, GetContractSourceCodeResponse, BlockCountdownQuery, BlockCountdownResponse, BlockNoByTimestampQuery, BlockRewardQuery, BlockRewardResponse, AccountTxListResponse, GetContractCreationQuery, GetContractCreationResponse, GetTransactionStatusQuery, GetTransactionStatusResponse, GetTransactionReceiptStatusQuery, GetTransactionReceiptStatusResponse, GetTokenBalanceQuery, GetContractSourceCodeFormatResponse, GetLogsResponseFormat, PageQuery } from './types';
 export * from './types';
-import { CustomFetch } from '../utils';
-import { GetEtherCompatTxListResponse } from '../types';
-import { BlockNumber } from './types';
+import { CustomFetch, Data, FetchCustomConfig, GetEtherCompatTxListResponse } from '../types';
 import ethers from 'ethers';
-import { FetchCustomConfig } from '../utils';
 export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: FetchCustomConfig): {
     provider: ethers.ethers.EtherscanProvider;
     account: {
@@ -92,55 +89,25 @@ export declare function etherscanPageData(chainOrBaseURL: string, apiKey: string
     globalAutoStart?: boolean;
 } & FetchCustomConfig): {
     account: {
-        txList: (q: AccountTxListQuery, cb: (currentPageData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], currentPageIndex: number, accumulatedData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], isFinish: boolean) => void, autoStart?: boolean) => {
+        txList: (args: AccountTxListQuery, cb: (currentPageData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], currentPageIndex: number, accumulatedData: (GetEtherCompatTxListResponse | AccountTxListResponse)[], isFinish: boolean) => void, autoStart?: boolean | undefined) => {
             resume: () => void;
-            stop: () => {
-                page: number;
-                offset: number;
-                sort: Sort;
-                startblock?: BlockNumber | undefined;
-                endblock?: BlockNumber | undefined;
-            };
+            stop: () => import("../types").Query;
         };
-        txListInternal: (q: AccountTxListInternalQuery, cb: (currentPageData: AccountTxListInternalResponse[], currentPageIndex: number, accumulatedData: AccountTxListInternalResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
+        txListInternal: (args: PageQuery, cb: (currentPageData: AccountTxListInternalResponse[], currentPageIndex: number, accumulatedData: AccountTxListInternalResponse[], isFinish: boolean) => void, autoStart?: boolean | undefined) => {
             resume: () => void;
-            stop: () => {
-                page: number;
-                offset: number;
-                sort: Sort;
-                startblock?: BlockNumber | undefined;
-                endblock?: BlockNumber | undefined;
-            };
+            stop: () => import("../types").Query;
         };
-        tokenTx: (q: AccountERC20TokenTransferEventQuery, cb: (currentPageData: AccountERC20TokenTransferEventResponse[], currentPageIndex: number, accumulatedData: AccountERC20TokenTransferEventResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
+        tokenTx: (args: AccountERC20TokenTransferEventQuery, cb: (currentPageData: AccountERC20TokenTransferEventResponse[], currentPageIndex: number, accumulatedData: AccountERC20TokenTransferEventResponse[], isFinish: boolean) => void, autoStart?: boolean | undefined) => {
             resume: () => void;
-            stop: () => {
-                page: number;
-                offset: number;
-                sort: Sort;
-                startblock?: BlockNumber | undefined;
-                endblock?: BlockNumber | undefined;
-            };
+            stop: () => import("../types").Query;
         };
-        tokenNftTx: (q: AccountERC721TokenTransferEventQuery, cb: (currentPageData: AccountERC721TokenTransferEventResponse[], currentPageIndex: number, accumulatedData: AccountERC721TokenTransferEventResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
+        tokenNftTx: (args: AccountERC721TokenTransferEventQuery, cb: (currentPageData: AccountERC721TokenTransferEventResponse[], currentPageIndex: number, accumulatedData: AccountERC721TokenTransferEventResponse[], isFinish: boolean) => void, autoStart?: boolean | undefined) => {
             resume: () => void;
-            stop: () => {
-                page: number;
-                offset: number;
-                sort: Sort;
-                startblock?: BlockNumber | undefined;
-                endblock?: BlockNumber | undefined;
-            };
+            stop: () => import("../types").Query;
         };
-        token1155Tx: (q: AccountERC1155TokenTransferEventQuery, cb: (currentPageData: AccountERC1155TokenTransferEventResponse[], currentPageIndex: number, accumulatedData: AccountERC1155TokenTransferEventResponse[], isFinish: boolean) => void, autoStart?: boolean) => {
+        token1155Tx: (args: AccountERC1155TokenTransferEventQuery, cb: (currentPageData: AccountERC1155TokenTransferEventResponse[], currentPageIndex: number, accumulatedData: AccountERC1155TokenTransferEventResponse[], isFinish: boolean) => void, autoStart?: boolean | undefined) => {
             resume: () => void;
-            stop: () => {
-                page: number;
-                offset: number;
-                sort: Sort;
-                startblock?: BlockNumber | undefined;
-                endblock?: BlockNumber | undefined;
-            };
+            stop: () => import("../types").Query;
         };
         /**
              * Returns the amount of Tokens a specific account owns.
@@ -161,15 +128,9 @@ export declare function etherscanPageData(chainOrBaseURL: string, apiKey: string
         getTokenBalance: (query: GetTokenBalanceQuery) => Promise<string>;
     };
     logs: {
-        getLogs: (q: GetLogsQuery, cb: (currentPageData: GetLogsResponseFormat[], currentPageIndex: number, accumulatedData: GetLogsResponseFormat[], isFinish: boolean) => void, autoStart?: boolean) => {
+        getLogs: (args: GetLogsQuery, cb: (currentPageData: GetLogsResponseFormat[], currentPageIndex: number, accumulatedData: GetLogsResponseFormat[], isFinish: boolean) => void, autoStart?: boolean | undefined) => {
             resume: () => void;
-            stop: () => {
-                page: number;
-                offset: number;
-                sort: Sort;
-                startblock?: BlockNumber | undefined;
-                endblock?: BlockNumber | undefined;
-            };
+            stop: () => import("../types").Query;
         };
     };
     provider: ethers.ethers.EtherscanProvider;

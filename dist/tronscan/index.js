@@ -12,10 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tronscanPageData = exports.tronscanAPI = void 0;
+exports.tronscanPageData = exports.tronscanAPI = exports.formatToEtherscanLogs = exports.formatToEtherscanTxs = void 0;
 const qs_1 = __importDefault(require("qs"));
 const whatwg_url_1 = require("whatwg-url");
-const types_1 = require("../types");
+const types_1 = require("./types");
+const types_2 = require("../types");
 const utils_1 = require("../utils");
 const base_urls_1 = __importDefault(require("./base-urls"));
 const omit_1 = __importDefault(require("lodash/omit"));
@@ -26,7 +27,7 @@ const defaultsDeep_1 = __importDefault(require("lodash/defaultsDeep"));
 const colors_1 = __importDefault(require("colors"));
 const node_emoji_1 = __importDefault(require("node-emoji"));
 const retry_1 = __importDefault(require("retry"));
-function handleTxList(response) {
+function formatToEtherscanTxs(response) {
     const data = response.data.map(el => {
         const value = el.raw_data.contract[0].parameter.value;
         // @ts-ignore
@@ -47,7 +48,8 @@ function handleTxList(response) {
     });
     return Object.assign(Object.assign({}, response), { data });
 }
-function handleLogs(response) {
+exports.formatToEtherscanTxs = formatToEtherscanTxs;
+function formatToEtherscanLogs(response) {
     const data = response.data.map(el => {
         return {
             address: el.contract_address,
@@ -63,6 +65,7 @@ function handleLogs(response) {
     });
     return Object.assign(Object.assign({}, response), { data });
 }
+exports.formatToEtherscanLogs = formatToEtherscanLogs;
 function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false }) {
     const fetch = customFetch || utils_1.defaultCustomFetch;
     // @ts-ignore: TS7053
@@ -78,7 +81,7 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
             try {
                 var data = yield fetch(url.toString(), Object.assign({}, apiKey ? {
                     headers: {
-                        TRON_PRO_API_KEY: apiKey,
+                        'TRON_PRO_API_KEY': apiKey,
                         'Content-Type': 'application/json'
                     }
                 } : undefined));
@@ -107,17 +110,14 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
         });
     }
     return {
-        [types_1.Module.Provider]: new tron_jsonrpc_provider_1.default(new whatwg_url_1.URL(`/jsonrpc`, baseURL).toString()),
-        [types_1.Module.Account]: {
+        [types_2.Module.Provider]: new tron_jsonrpc_provider_1.default(new whatwg_url_1.URL(`/jsonrpc`, baseURL).toString()),
+        [types_2.Module.Account]: {
             accountInfo: function (query) {
                 return handleResponse(get(['accounts', query.address], (0, omit_1.default)(query, ['address'])));
             },
             txList: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
                     const result = yield get(['accounts', query.address, 'transactions'], (0, omit_1.default)(query, ['address']));
-                    if (options.dataCompatible) {
-                        return handleTxList(result);
-                    }
                     return result;
                 });
             },
@@ -125,13 +125,10 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
                 return get(['accounts', query.address, 'transactions', 'trc20'], (0, omit_1.default)(query, ['address']));
             }
         },
-        [types_1.Module.Contract]: {
+        [types_2.Module.Contract]: {
             txList: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
                     const result = yield get(['contracts', query.address, 'transactions'], (0, omit_1.default)(query, ['address']));
-                    if (options.dataCompatible) {
-                        return handleTxList(result);
-                    }
                     return result;
                 });
             },
@@ -139,23 +136,23 @@ function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompat
                 return get(['contracts', query.address, 'tokens'], (0, omit_1.default)(query, 'address'));
             }
         },
-        [types_1.Module.Logs]: {
+        [types_2.Module.Logs]: {
             txLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
                     const result = yield get(['transactions', query.txId, 'events'], (0, omit_1.default)(query, 'txId'));
-                    return handleLogs(result);
+                    return result;
                 });
             },
             contractLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
                     const result = yield get(['contracts', query.address, 'events'], (0, omit_1.default)(query, 'address'));
-                    return handleLogs(result);
+                    return result;
                 });
             },
             blockLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
                     const result = yield get(['blocks', query.blockNumber + '', 'events'], (0, omit_1.default)(query, 'blockNumber'));
-                    return handleLogs(result);
+                    return result;
                 });
             }
         }
@@ -165,7 +162,7 @@ exports.tronscanAPI = tronscanAPI;
 function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globalAutoStart: true }) {
     const fetch = customFetch || utils_1.defaultCustomFetch;
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options);
-    const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3);
+    const retries = typeof options.retry === 'string' ? options.retry : (typeof options.retry === 'number' ? options.retry : 3);
     const operation = retry_1.default.operation(Object.assign({
         minTimeout: 10000,
         maxTimeout: 30000,
@@ -175,20 +172,21 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
     } : {
         retries: retries,
     }));
-    function fetchPageData(getData) {
+    function fetchPageData(getData, matchFields) {
         return function (query, cb, autoStart) {
             const data = [];
             let nextLink = '';
             let currentLink = '';
             let isStopped = false;
             let index = 0;
-            const request = function (query) {
-                var _a, _b;
+            let nextQuery = query;
+            const request = function () {
+                var _a, _b, _c, _d;
                 return __awaiter(this, void 0, void 0, function* () {
                     try {
                         let data;
                         if (!nextLink) {
-                            data = yield getData(Object.assign({}, query));
+                            data = yield getData(Object.assign({}, nextQuery));
                             currentLink = ((_a = data.meta.links) === null || _a === void 0 ? void 0 : _a.current) || '';
                         }
                         else {
@@ -200,16 +198,42 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                         return data;
                     }
                     catch (e) {
-                        // @ts-ignore
+                        debugger;
+                        //@ts-ignore
+                        if (((_d = (_c = e === null || e === void 0 ? void 0 : e.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.statusCode) === 400 && matchFields) {
+                            const { blockTimestamp } = matchFields((0, lodash_1.last)(data));
+                            const maxTimestamp = (query.orderBy === types_1.BlockTimestampSort.DESC || !query.orderBy) ? Number(blockTimestamp) : query.maxTimestamp;
+                            const minTimestamp = query.orderBy === types_1.BlockTimestampSort.ASC ? Number(blockTimestamp) : query.minTimestamp;
+                            if (maxTimestamp !== undefined) {
+                                nextQuery.maxTimestamp = maxTimestamp;
+                            }
+                            if (minTimestamp !== undefined) {
+                                nextQuery.minTimestamp = minTimestamp;
+                            }
+                            nextLink = '';
+                            currentLink = '';
+                            let response = yield request();
+                            const last2000Data = data.slice(-2000);
+                            const uniqResponseData = ((response === null || response === void 0 ? void 0 : response.data) || []).filter(el => {
+                                const { blockTimestamp, blockNumber, hash, logIndex } = matchFields(el);
+                                return !last2000Data.find(dataItem => {
+                                    const item = matchFields(dataItem);
+                                    return item.blockNumber === blockNumber && item.blockTimestamp === blockTimestamp && item.hash === hash && item.logIndex === logIndex;
+                                });
+                            });
+                            return Object.assign({}, response, {
+                                data: uniqResponseData
+                            });
+                        }
                         throw e;
                     }
                 });
             };
-            const get = function (query) {
+            const get = function () {
                 var _a;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (retries === 0) {
-                        const data = yield request(query);
+                        const data = yield request();
                         if (options.debug) {
                             console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${currentLink}`);
                         }
@@ -217,7 +241,7 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                     }
                     return new Promise((resolve, reject) => {
                         operation.attempt(function (attempt) {
-                            request(query).then((data) => {
+                            request().then((data) => {
                                 var _a;
                                 if (options === null || options === void 0 ? void 0 : options.debug) {
                                     console.log(`${colors_1.default.green(`${(_a = node_emoji_1.default.find('✅')) === null || _a === void 0 ? void 0 : _a.emoji}`)} ${currentLink}`);
@@ -241,7 +265,7 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
             function loop() {
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!isStopped) {
-                        let response = yield get(query);
+                        let response = yield get();
                         while (response && response.success && response.data.length > 0) {
                             data.push(...response.data);
                             cb(response.data, index, data, false);
@@ -252,7 +276,7 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                                     }
                                     return;
                                 }
-                                response = yield get(query);
+                                response = yield get();
                             }
                             else {
                                 response = null;
@@ -283,20 +307,52 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
         };
     }
     return {
-        [types_1.Module.Provider]: tronscan.provider,
-        [types_1.Module.Account]: {
+        [types_2.Module.Provider]: tronscan.provider,
+        [types_2.Module.Account]: {
             accountInfo: tronscan.account.accountInfo,
-            txList: fetchPageData(tronscan.account.txList),
-            tokenTransfer: fetchPageData(tronscan.account.tokenTransfer)
+            txList: fetchPageData(tronscan.account.txList, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.blockNumber,
+                    hash: item.txID
+                };
+            }),
+            tokenTransfer: fetchPageData(tronscan.account.tokenTransfer, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    hash: item.transaction_id
+                };
+            })
         },
-        [types_1.Module.Contract]: {
+        [types_2.Module.Contract]: {
             tokenBalance: fetchPageData(tronscan.contract.tokenBalance),
-            txList: fetchPageData(tronscan.contract.txList)
+            txList: fetchPageData(tronscan.contract.txList, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.blockNumber,
+                    hash: item.txID
+                };
+            })
         },
-        [types_1.Module.Logs]: {
+        [types_2.Module.Logs]: {
+            // @ts-ignore
             txLogs: fetchPageData(tronscan.logs.txLogs),
-            contractLogs: fetchPageData(tronscan.logs.contractLogs),
-            blockLogs: fetchPageData(tronscan.logs.blockLogs),
+            contractLogs: fetchPageData(tronscan.logs.contractLogs, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.block_number,
+                    hash: item.transaction_id,
+                    logIndex: item.event_index
+                };
+            }),
+            blockLogs: fetchPageData(tronscan.logs.blockLogs, (item) => {
+                return {
+                    blockTimestamp: item.block_timestamp,
+                    blockNumber: item.block_number,
+                    hash: item.transaction_id,
+                    logIndex: item.event_index
+                };
+            }),
         }
     };
 }

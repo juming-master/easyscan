@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { Command } = require('commander')
-const { etherscanPageData } = require('../dist/etherscan')
+const { etherscanPageData } = require('easyscan')
 const program = new Command()
 const fs = require('fs-extra')
 const path = require('path')

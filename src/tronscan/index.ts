@@ -145,7 +145,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
     const fetch = customFetch || defaultCustomFetch
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options)
 
-    const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3)
+    const retries = typeof options.retry === 'string' ? options.retry : (typeof options.retry === 'number' ? options.retry : 3)
     const operation = retry.operation(Object.assign({
         minTimeout: 10000,
         maxTimeout: 30000,

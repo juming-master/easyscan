@@ -40,12 +40,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.etherscanPageData = exports.etherscanAPI = void 0;
 const qs_1 = __importDefault(require("qs"));
-const types_1 = require("./types");
+const page_query_1 = require("../utils/page-query");
 __exportStar(require("./types"), exports);
 const whatwg_url_1 = require("whatwg-url");
 const base_urls_1 = __importDefault(require("./base-urls"));
 const utils_1 = require("../utils");
-const types_2 = require("../types");
+const types_1 = require("../types");
 const lodash_1 = require("lodash");
 const bignumber_js_1 = __importDefault(require("bignumber.js"));
 const ethers_1 = __importStar(require("ethers"));
@@ -69,9 +69,6 @@ function handleTxList(response) {
         };
     });
     return Object.assign(Object.assign({}, response), { result });
-}
-function handleLogs(response) {
-    return response;
 }
 function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: false, retry: 3 }) {
     const fetch = customFetch || utils_1.defaultCustomFetch;
@@ -112,7 +109,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
         return __awaiter(this, void 0, void 0, function* () {
             const urlObj = new whatwg_url_1.URL(`/api?${qs_1.default.stringify(Object.assign({ apiKey: apiKey, module }, query))}`, baseURL);
             const url = urlObj.toString();
-            const retries = typeof options.retry === 'string' ? options.retry : (options.retry || 3);
+            const retries = typeof options.retry === 'string' ? options.retry : (typeof options.retry === 'number' ? options.retry : 3);
             if (retries === 0) {
                 const data = yield request(url);
                 if (options.debug) {
@@ -152,7 +149,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
     };
     function getSourceCode(query) {
         return __awaiter(this, void 0, void 0, function* () {
-            return get(types_2.Module.Contract, Object.assign({
+            return get(types_1.Module.Contract, Object.assign({
                 action: 'getsourcecode',
             }, query)).then(r => r.result);
         });
@@ -247,13 +244,13 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
         });
     }
     return {
-        [types_2.Module.Provider]: etherscanProvider,
-        [types_2.Module.Account]: {
+        [types_1.Module.Provider]: etherscanProvider,
+        [types_1.Module.Account]: {
             /**
                  * Returns the amount of Tokens a specific account owns.
                  */
             tokenBalance: function (query) {
-                return handleResponse(get(types_2.Module.Account, Object.assign({
+                return handleResponse(get(types_1.Module.Account, Object.assign({
                     action: 'tokenbalance',
                     tag: 'latest',
                 }, query)));
@@ -267,7 +264,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
                     address = address.join(',');
                     action = 'balancemulti';
                 }
-                return handleResponse(get(types_2.Module.Account, Object.assign({
+                return handleResponse(get(types_1.Module.Account, Object.assign({
                     action,
                     address,
                     tag: 'latest'
@@ -278,7 +275,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
              */
             txList: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    const result = yield get(types_2.Module.Account, Object.assign({
+                    const result = yield get(types_1.Module.Account, Object.assign({
                         action: 'txlist',
                         startblock: 0,
                         endblock: 'latest',
@@ -294,7 +291,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
              * Get a list of internal transactions
              */
             txListInternal: function (query) {
-                return get(types_2.Module.Account, Object.assign({
+                return get(types_1.Module.Account, Object.assign({
                     action: 'txlistinternal',
                     startblock: 0,
                     endblock: 'latest',
@@ -305,7 +302,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
              * Get a list of blocks that a specific account has mineds
              */
             getMinedBlocks: function (query) {
-                return get(types_2.Module.Account, Object.assign({
+                return get(types_1.Module.Account, Object.assign({
                     action: 'getminedblocks',
                     blocktype: 'blocks',
                 }, query));
@@ -314,7 +311,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             * Get a list of "ERC20 - Token Transfer Events" by Address
             */
             tokenTx: function (query) {
-                return get(types_2.Module.Account, Object.assign({
+                return get(types_1.Module.Account, Object.assign({
                     action: 'tokentx',
                     startblock: 0,
                     endblock: 'latest',
@@ -325,7 +322,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             * Get a list of "ERC721 - Token Transfer Events" by Address
             */
             tokenNftTx: function (query) {
-                return get(types_2.Module.Account, Object.assign({
+                return get(types_1.Module.Account, Object.assign({
                     action: 'tokennfttx',
                     startblock: 0,
                     endblock: 'latest',
@@ -336,7 +333,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             * Get a list of "ERC1155 - Token Transfer Events" by Address
             */
             token1155Tx: function (query) {
-                return get(types_2.Module.Account, Object.assign({
+                return get(types_1.Module.Account, Object.assign({
                     action: 'token1155tx',
                     startblock: 0,
                     endblock: 'latest',
@@ -347,38 +344,40 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
              * Gethistorical ether balance for a single address by blockNo.
              */
             balanceHistory(query) {
-                return handleResponse(get(types_2.Module.Account, Object.assign({
+                return handleResponse(get(types_1.Module.Account, Object.assign({
                     action: 'balancehistory'
                 }, query)));
             },
             getTokenBalance: function (query) {
-                return handleResponse(get(types_2.Module.Account, Object.assign({
+                return handleResponse(get(types_1.Module.Account, Object.assign({
                     action: 'tokenbalance',
                     contractaddress: query.contractAddress
                 }, query)));
             }
         },
-        [types_2.Module.Logs]: {
+        [types_1.Module.Logs]: {
             /**
                * The Event Log API was designed to provide an alternative to the native eth_getLogs.
                */
             getLogs: function (query) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    const result = yield get(types_2.Module.Logs, Object.assign({
+                    const result = yield get(types_1.Module.Logs, Object.assign({
                         action: 'getLogs',
+                        sort: types_1.Sort.ASC
+                    }, (0, lodash_1.omit)(query, 'compatable', 'startblock', 'endblock'), {
                         fromBlock: typeof query.startblock === 'undefined' ? 0 : query.startblock,
                         toBlock: typeof query.endblock === 'undefined' ? 'latest' : query.endblock,
-                    }, (0, lodash_1.omit)(query, 'compatable'))).then(response => (Object.assign(Object.assign({}, response), { result: response.result.map(el => (Object.assign(Object.assign({}, (0, lodash_1.omit)(el, 'transactionHash')), { hash: el.transactionHash }))) })));
+                    })).then(response => (Object.assign(Object.assign({}, response), { result: response.result.map(el => (Object.assign(Object.assign({}, (0, lodash_1.omit)(el, 'transactionHash')), { hash: el.transactionHash }))) })));
                     return result;
                 });
             }
         },
-        [types_2.Module.Contract]: {
+        [types_1.Module.Contract]: {
             /**
                * Get the ABI
                */
             getABI: function (query) {
-                return handleResponse(get(types_2.Module.Contract, Object.assign({
+                return handleResponse(get(types_1.Module.Contract, Object.assign({
                     action: 'getabi',
                 }, query)));
             },
@@ -395,17 +394,17 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
                 return getContract(query.address, []);
             },
             getContractCreation: function (query) {
-                return handleResponse(get(types_2.Module.Contract, Object.assign({
+                return handleResponse(get(types_1.Module.Contract, Object.assign({
                     action: 'getcontractcreation',
                 }, query)));
             }
         },
-        [types_2.Module.Block]: {
+        [types_1.Module.Block]: {
             /**
              * Find the block reward for a given address and block
              */
             getBlockreward: function (query) {
-                return handleResponse(get(types_2.Module.Block, Object.assign({
+                return handleResponse(get(types_1.Module.Block, Object.assign({
                     action: 'getblockreward',
                 }, query)));
             },
@@ -413,7 +412,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
              * Find the block countdown for a given address and block
              */
             getBlockCountdown: function (query) {
-                return handleResponse(get(types_2.Module.Block, Object.assign({
+                return handleResponse(get(types_1.Module.Block, Object.assign({
                     action: 'getblockcountdown',
                 }, query)));
             },
@@ -421,19 +420,19 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
              * Find the block no for a given timestamp
              */
             getBlockNumberByTime: function (query) {
-                return handleResponse(get(types_2.Module.Block, Object.assign({
+                return handleResponse(get(types_1.Module.Block, Object.assign({
                     action: 'getblocknobytime',
                 }, query)));
             }
         },
-        [types_2.Module.Transaction]: {
+        [types_1.Module.Transaction]: {
             getStatus: function (query) {
-                return handleResponse(get(types_2.Module.Transaction, Object.assign({
+                return handleResponse(get(types_1.Module.Transaction, Object.assign({
                     action: 'getstatus',
                 }, query)));
             },
             getTxReceiptStatus: function (query) {
-                return handleResponse(get(types_2.Module.Transaction, Object.assign({
+                return handleResponse(get(types_1.Module.Transaction, Object.assign({
                     action: 'gettxreceiptstatus',
                 }, query)));
             }
@@ -444,101 +443,22 @@ exports.etherscanAPI = etherscanAPI;
 function etherscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globalAutoStart: true }) {
     const etherscan = etherscanAPI(chainOrBaseURL, apiKey, customFetch, options);
     function fetchPageData(getData) {
-        return function (q, cb, autoStart) {
-            const query = q;
-            if (query.offset * query.page > MAX_SIZE) {
-                throw new Error(`page * offset should be less than ${MAX_SIZE}`);
-            }
-            const data = [];
-            let isStopped = false;
-            let index = 0;
-            let page = query.page;
-            const offset = query.offset || 10000;
-            let accItemLength = 0;
-            let nextQuery = query;
-            function fetchData(query) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    let data = yield getData(query);
-                    index++;
-                    return data;
-                });
-            }
-            function loop() {
-                return __awaiter(this, void 0, void 0, function* () {
-                    if (!isStopped) {
-                        let response = yield fetchData(Object.assign({ offset }, nextQuery));
-                        accItemLength = accItemLength + response.result.length;
-                        data.push(...response.result);
-                        cb(response.result, index, data, false);
-                        while (response.result.length === offset) {
-                            if (accItemLength + offset > MAX_SIZE) {
-                                const startblock = (query.sort === types_1.Sort.ASC || !query.sort) ? Number(data[data.length - 1].blockNumber) : query.startblock;
-                                const endblock = query.sort === types_1.Sort.DESC ? Number(data[data.length - 1].blockNumber) : query.endblock;
-                                page = 1;
-                                nextQuery = Object.assign(Object.assign({}, nextQuery), { page,
-                                    offset });
-                                if (startblock !== undefined) {
-                                    nextQuery.startblock = startblock;
-                                }
-                                if (endblock !== undefined) {
-                                    nextQuery.endblock = endblock;
-                                }
-                                if (isStopped) {
-                                    if (options.debug) {
-                                        console.log(`${colors_1.default.red('Stop')}`);
-                                    }
-                                    return;
-                                }
-                                response = yield fetchData(nextQuery);
-                                const last2000Data = data.slice(-offset);
-                                const uniqResponse = Object.assign(Object.assign({}, response), { result: response.result.filter(el => {
-                                        return !last2000Data.find(item => item.blockNumber === el.blockNumber && item.hash === el.hash && item.logIndex === el.logIndex);
-                                    }) });
-                                accItemLength = response.result.length;
-                                data.push(...uniqResponse.result);
-                                cb(uniqResponse.result, index, data, false);
-                            }
-                            else {
-                                page++;
-                                nextQuery = Object.assign(Object.assign({}, nextQuery), { page,
-                                    offset });
-                                if (isStopped) {
-                                    if (options.debug) {
-                                        console.log(`${colors_1.default.red('Stop')}`);
-                                    }
-                                    return;
-                                }
-                                response = yield fetchData(nextQuery);
-                                accItemLength = accItemLength + response.result.length;
-                                data.push(...response.result);
-                                cb(response.result, index, data, false);
-                            }
-                        }
-                        cb([], index, data, true);
-                    }
-                });
-            }
-            function resume() {
-                if (!isStopped) {
-                    return;
-                }
-                if (options.debug) {
-                    console.log(`${colors_1.default.green('Resume')}`);
-                }
-                isStopped = false;
-                loop();
-            }
-            function stop() {
-                isStopped = true;
-                return nextQuery;
-            }
-            if (typeof autoStart === 'boolean' ? autoStart : typeof options.globalAutoStart === 'boolean' ? options.globalAutoStart : true) {
-                loop();
-            }
-            return { resume, stop };
-        };
+        return (0, page_query_1.fetchOffsetPageData)({
+            getData,
+            // parse the original parameters to fetchPageData parameters.
+            parseArgs: (args) => {
+                return Object.assign(Object.assign({}, (0, lodash_1.omit)(args, 'startblock', 'endblock', 'page', 'offset', 'sort')), { start: args.startblock, end: args.endblock, page: args.page, limit: args.offset, sort: args.sort });
+            },
+            // format the fetchPageData parameters to original parameters.
+            formatArgs: (args) => {
+                return Object.assign(Object.assign({}, (0, lodash_1.omit)(args, 'start', 'end', 'page', 'limit', 'sort')), { startblock: args.start, endblock: args.end, page: args.page, offset: args.limit, sort: args.sort });
+            },
+            checkBlock: (item) => Number(item.blockNumber),
+            isEqualItem: (a, b) => a.blockNumber === b.blockNumber && a.hash === b.hash && a.logIndex === b.logIndex,
+            options: Object.assign({ maxSize: MAX_SIZE }, options)
+        });
     }
-    return Object.assign(Object.assign({}, etherscan), { [types_2.Module.Account]: Object.assign(Object.assign({}, etherscan.account), { txList: fetchPageData(etherscan.account.txList), txListInternal: fetchPageData(etherscan.account.txListInternal), tokenTx: fetchPageData(etherscan.account.tokenTx), tokenNftTx: fetchPageData(etherscan.account.tokenNftTx), token1155Tx: fetchPageData(etherscan.account.token1155Tx) }), [types_2.Module.Logs]: {
+    return Object.assign(Object.assign({}, etherscan), { [types_1.Module.Account]: Object.assign(Object.assign({}, etherscan.account), { txList: fetchPageData(etherscan.account.txList), txListInternal: fetchPageData(etherscan.account.txListInternal), tokenTx: fetchPageData(etherscan.account.tokenTx), tokenNftTx: fetchPageData(etherscan.account.tokenNftTx), token1155Tx: fetchPageData(etherscan.account.token1155Tx) }), [types_1.Module.Logs]: {
             getLogs: fetchPageData(etherscan.logs.getLogs)
         } });
 }

@@ -8,7 +8,7 @@ var TronStatus;
 })(TronStatus = exports.TronStatus || (exports.TronStatus = {}));
 var BlockTimestampSort;
 (function (BlockTimestampSort) {
-    BlockTimestampSort["asc"] = "block_timestamp,asc";
-    BlockTimestampSort["desc"] = "block_timestamp,desc";
+    BlockTimestampSort["ASC"] = "block_timestamp,asc";
+    BlockTimestampSort["DESC"] = "block_timestamp,desc";
 })(BlockTimestampSort = exports.BlockTimestampSort || (exports.BlockTimestampSort = {}));
 //# sourceMappingURL=types.js.map
