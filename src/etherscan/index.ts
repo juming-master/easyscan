@@ -52,7 +52,7 @@ import { defaultCustomFetch } from '../utils'
 import { CustomFetch, Data, FetchCustomConfig, GetEtherCompatTxListResponse, Module, Sort, Status } from '../types'
 import { omit, findKey } from 'lodash'
 import BigNumber from 'bignumber.js'
-import ethers, { JsonFragment, EtherscanProvider, EtherscanPlugin, Network } from 'ethers'
+import { JsonFragment, EtherscanProvider, EtherscanPlugin, Network, getAddress, isAddress, stripZerosLeft } from 'ethers'
 import retry from 'retry'
 import colors from 'colors'
 import nodeEmoji from 'node-emoji'
@@ -193,7 +193,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
         }
         let implementation: GetContractSourceCodeFormatResponse | null = null
         // avoid implemention === address cycle
-        if (code.Implementation && ethers.isAddress(code.Implementation) && ethers.getAddress(code.Implementation).toLowerCase() !== ethers.getAddress(address).toLowerCase()) {
+        if (code.Implementation && isAddress(code.Implementation) && getAddress(code.Implementation).toLowerCase() !== getAddress(address).toLowerCase()) {
             implementation = await getContract(code.Implementation, mergedAbi)
         }
         return {
@@ -216,8 +216,8 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
         }
     }
 
-    async function getContract(addr: string, mergedAbi: ethers.JsonFragment[]): Promise<GetContractSourceCodeFormatResponse | null> {
-        const address = ethers.getAddress(addr).toLowerCase()
+    async function getContract(addr: string, mergedAbi: JsonFragment[]): Promise<GetContractSourceCodeFormatResponse | null> {
+        const address = getAddress(addr).toLowerCase()
         const bytecode = await etherscanProvider.getCode(address, 'latest')
         if (bytecode === '0x') {
             return null
@@ -230,7 +230,7 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
         let implementation = code.Implementation
         if (!implementation) {
             const slot = await etherscanProvider.getStorage(address, '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc', 'latest')
-            const implementionSlot = ethers.stripZerosLeft(slot)
+            const implementionSlot = stripZerosLeft(slot)
             if (implementionSlot !== '0x') {
                 code.Implementation = implementionSlot
             }

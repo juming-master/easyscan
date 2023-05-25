@@ -1,9 +1,9 @@
 import { AccountTxListInternalResponse, AccountBalanceQuery, AccountBalanceResponse, AccountTokenBalanceQuery, AccountTxListInternalQuery, AccountTxListQuery, AccountMineBlocksQuery, AccountERC20TokenTransferEventQuery, AccountERC721TokenTransferEventQuery, AccountERC1155TokenTransferEventQuery, AccountMineBlocksResponse, AccountERC20TokenTransferEventResponse, AccountERC721TokenTransferEventResponse, AccountERC1155TokenTransferEventResponse, AccountHistoryBalanceOfEthQuery, GetLogsQuery, GetContractABIQuery, GetContractSourceCodeQuery, GetContractSourceCodeResponse, BlockCountdownQuery, BlockCountdownResponse, BlockNoByTimestampQuery, BlockRewardQuery, BlockRewardResponse, AccountTxListResponse, GetContractCreationQuery, GetContractCreationResponse, GetTransactionStatusQuery, GetTransactionStatusResponse, GetTransactionReceiptStatusQuery, GetTransactionReceiptStatusResponse, GetTokenBalanceQuery, GetContractSourceCodeFormatResponse, GetLogsResponseFormat, PageQuery } from './types';
 export * from './types';
 import { CustomFetch, Data, FetchCustomConfig, GetEtherCompatTxListResponse } from '../types';
-import ethers from 'ethers';
+import { EtherscanProvider } from 'ethers';
 export declare function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch?: CustomFetch, options?: FetchCustomConfig): {
-    provider: ethers.ethers.EtherscanProvider;
+    provider: EtherscanProvider;
     account: {
         /**
              * Returns the amount of Tokens a specific account owns.
@@ -133,7 +133,7 @@ export declare function etherscanPageData(chainOrBaseURL: string, apiKey: string
             stop: () => import("../types").Query;
         };
     };
-    provider: ethers.ethers.EtherscanProvider;
+    provider: EtherscanProvider;
     contract: {
         /**
            * Get the ABI

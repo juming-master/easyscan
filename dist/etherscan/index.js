@@ -10,20 +10,8 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
 }));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
-};
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
 };
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -48,7 +36,7 @@ const utils_1 = require("../utils");
 const types_1 = require("../types");
 const lodash_1 = require("lodash");
 const bignumber_js_1 = __importDefault(require("bignumber.js"));
-const ethers_1 = __importStar(require("ethers"));
+const ethers_1 = require("ethers");
 const retry_1 = __importDefault(require("retry"));
 const colors_1 = __importDefault(require("colors"));
 const node_emoji_1 = __importDefault(require("node-emoji"));
@@ -192,7 +180,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             }
             let implementation = null;
             // avoid implemention === address cycle
-            if (code.Implementation && ethers_1.default.isAddress(code.Implementation) && ethers_1.default.getAddress(code.Implementation).toLowerCase() !== ethers_1.default.getAddress(address).toLowerCase()) {
+            if (code.Implementation && (0, ethers_1.isAddress)(code.Implementation) && (0, ethers_1.getAddress)(code.Implementation).toLowerCase() !== (0, ethers_1.getAddress)(address).toLowerCase()) {
                 implementation = yield getContract(code.Implementation, mergedAbi);
             }
             return {
@@ -217,7 +205,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
     }
     function getContract(addr, mergedAbi) {
         return __awaiter(this, void 0, void 0, function* () {
-            const address = ethers_1.default.getAddress(addr).toLowerCase();
+            const address = (0, ethers_1.getAddress)(addr).toLowerCase();
             const bytecode = yield etherscanProvider.getCode(address, 'latest');
             if (bytecode === '0x') {
                 return null;
@@ -230,7 +218,7 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
             let implementation = code.Implementation;
             if (!implementation) {
                 const slot = yield etherscanProvider.getStorage(address, '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc', 'latest');
-                const implementionSlot = ethers_1.default.stripZerosLeft(slot);
+                const implementionSlot = (0, ethers_1.stripZerosLeft)(slot);
                 if (implementionSlot !== '0x') {
                     code.Implementation = implementionSlot;
                 }
