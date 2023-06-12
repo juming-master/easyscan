@@ -1,6 +1,7 @@
 import { JsonRpcProvider } from 'ethers'
 import { fromHex, toHex } from 'tron-format-address'
 import { toBigInt } from 'ethers'
+import { BlockNumber } from '../types'
 export interface Transaction {
     blockHash: string | null,
     blockNumber: number | null,

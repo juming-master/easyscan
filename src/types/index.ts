@@ -50,7 +50,7 @@ export enum Module {
     Proxy = 'proxy'
 }
 
-export interface GetEtherCompatQuery { compatable?: false }
+export interface GetEtherCompatQuery {  }
 
 export interface GetEtherCompatTxListResponse {
     blockNumber: string;

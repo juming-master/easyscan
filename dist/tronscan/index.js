@@ -27,30 +27,40 @@ const defaultsDeep_1 = __importDefault(require("lodash/defaultsDeep"));
 const colors_1 = __importDefault(require("colors"));
 const node_emoji_1 = __importDefault(require("node-emoji"));
 const retry_1 = __importDefault(require("retry"));
-function formatToEtherscanTxs(response) {
-    const data = response.data.map(el => {
-        const value = el.raw_data.contract[0].parameter.value;
-        // @ts-ignore
-        const to = value.contract_address || value.to_address || value.receiver_address || value.origin_address;
-        return {
-            blockNumber: String(el.blockNumber),
-            timeStamp: new bignumber_js_1.default(el.block_timestamp).idiv(1000, bignumber_js_1.default.ROUND_DOWN).toFixed(),
-            hash: el.txID,
-            from: value.owner_address,
-            to,
+const tron_format_address_1 = require("tron-format-address");
+var Status;
+(function (Status) {
+    Status["SUCCESS"] = "1";
+    Status["ERROR"] = "0";
+})(Status || (Status = {}));
+const MAX_SIZE = 10000;
+function formatToEtherscanTxs(data) {
+    return data.map(el => {
+        var _a;
+        if ((_a = el.raw_data) === null || _a === void 0 ? void 0 : _a.contract) {
+            const value = el.raw_data.contract[0].parameter.value;
             // @ts-ignore
-            value: value.amount || '0',
-            fee: el.ret[0].fee + '',
-            isError: el.ret[0].contractRet !== 'SUCCESS',
-            // @ts-ignore
-            input: value.data,
-        };
-    });
-    return Object.assign(Object.assign({}, response), { data });
+            const to = value.contract_address || value.to_address || value.receiver_address || value.origin_address;
+            return {
+                blockNumber: String(el.blockNumber),
+                timeStamp: new bignumber_js_1.default(el.block_timestamp).div(1000).dp(0, bignumber_js_1.default.ROUND_DOWN).toFixed(),
+                hash: el.txID,
+                from: value.owner_address && (0, tron_format_address_1.fromHex)(value.owner_address),
+                to: to && (0, tron_format_address_1.fromHex)(to),
+                // @ts-ignore
+                value: value.amount || '0',
+                fee: el.ret[0].fee + '',
+                isError: el.ret[0].contractRet !== 'SUCCESS',
+                // @ts-ignore
+                input: value.data,
+            };
+        }
+        return null;
+    }).filter(el => !!el);
 }
 exports.formatToEtherscanTxs = formatToEtherscanTxs;
-function formatToEtherscanLogs(response) {
-    const data = response.data.map(el => {
+function formatToEtherscanLogs(data) {
+    return data.map(el => {
         return {
             address: el.contract_address,
             result: el.result,
@@ -63,7 +73,6 @@ function formatToEtherscanLogs(response) {
             eventName: el.event_name,
         };
     });
-    return Object.assign(Object.assign({}, response), { data });
 }
 exports.formatToEtherscanLogs = formatToEtherscanLogs;
 function tronscanAPI(chainOrBaseURL, apiKey, customFetch, options = { dataCompatible: false }) {
@@ -163,15 +172,6 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
     const fetch = customFetch || utils_1.defaultCustomFetch;
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options);
     const retries = typeof options.retry === 'string' ? options.retry : (typeof options.retry === 'number' ? options.retry : 3);
-    const operation = retry_1.default.operation(Object.assign({
-        minTimeout: 10000,
-        maxTimeout: 30000,
-        randomize: false
-    }, typeof retries === 'string' ? {
-        forever: true
-    } : {
-        retries: retries,
-    }));
     function fetchPageData(getData, matchFields) {
         return function (query, cb, autoStart) {
             const data = [];
@@ -180,6 +180,15 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
             let isStopped = false;
             let index = 0;
             let nextQuery = query;
+            const operation = retry_1.default.operation(Object.assign({
+                minTimeout: 10000,
+                maxTimeout: 30000,
+                randomize: false
+            }, typeof retries === 'string' ? {
+                forever: true
+            } : {
+                retries: retries,
+            }));
             const request = function () {
                 var _a, _b, _c, _d;
                 return __awaiter(this, void 0, void 0, function* () {
@@ -198,7 +207,6 @@ function tronscanPageData(chainOrBaseURL, apiKey, customFetch, options = { globa
                         return data;
                     }
                     catch (e) {
-                        debugger;
                         //@ts-ignore
                         if (((_d = (_c = e === null || e === void 0 ? void 0 : e.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.statusCode) === 400 && matchFields) {
                             const { blockTimestamp } = matchFields((0, lodash_1.last)(data));

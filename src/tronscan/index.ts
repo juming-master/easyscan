@@ -1,6 +1,6 @@
 import qs from 'qs'
 import { URL } from 'whatwg-url'
-import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery, BlockTimestampSort, TronPageQuery } from './types'
+import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronTokenBalanceQuery, GetTronTokenBalanceResponse, GetTronAccountInfoResponseOrigin, GetTronAccountTokenTransferQuery, GetTronAccountTokenTransferResponse, GetTronAccountTxListQuery, GetTronAccountTxListResponse, GetTronTransactionLogsQuery, GetTronLogsResponse, GetTronContractLogsQuery, GetTronBlockLogsQuery, BlockTimestampSort, TronPageQuery, TronScanAPIListData, TronScanAPIListPageQuery, GetTronScanAccountTxListResponse } from './types'
 import { GetEtherCompatTxListResponse, Module } from '../types'
 import { defaultCustomFetch } from '../utils'
 import { CustomFetch, FetchCustomConfig } from '../types'
@@ -13,34 +13,50 @@ import defaultsDeep from 'lodash/defaultsDeep'
 import colors from 'colors'
 import nodeEmoji from 'node-emoji'
 import retry from 'retry'
+import { fetchOffsetPageData } from '../utils/page-query'
+import { fromHex, toHex } from 'tron-format-address'
 
-export function formatToEtherscanTxs(response: TronData<GetTronAccountTxListResponse[]>): TronData<GetEtherCompatTxListResponse[]> {
-    const data = response.data.map(el => {
-        const value = el.raw_data.contract[0].parameter.value
-        // @ts-ignore
-        const to = value.contract_address || value.to_address || value.receiver_address || value.origin_address
-        return {
-            blockNumber: String(el.blockNumber),
-            timeStamp: new BigNumber(el.block_timestamp).idiv(1000, BigNumber.ROUND_DOWN).toFixed(),
-            hash: el.txID,
-            from: value.owner_address,
-            to,
-            // @ts-ignore
-            value: value.amount || '0',
-            fee: el.ret[0].fee + '',
-            isError: el.ret[0].contractRet !== 'SUCCESS',
-            // @ts-ignore
-            input: value.data,
-        }
-    })
-    return {
-        ...response,
-        data
-    }
+enum Status {
+    SUCCESS = '1',
+    ERROR = '0'
 }
 
-export function formatToEtherscanLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEtherCompatLogsResponse[]> {
-    const data = response.data.map(el => {
+interface Data<T> {
+    status: Status,
+    message: "OK" | "NOTOK",
+    result: T,
+    error?: Error | string
+}
+
+
+const MAX_SIZE = 10000
+
+export function formatToEtherscanTxs(data: GetTronAccountTxListResponse[]): GetEtherCompatTxListResponse[] {
+    return data.map(el => {
+        if (el.raw_data?.contract) {
+            const value = el.raw_data.contract[0].parameter.value
+            // @ts-ignore
+            const to = value.contract_address || value.to_address || value.receiver_address || value.origin_address
+            return {
+                blockNumber: String(el.blockNumber),
+                timeStamp: new BigNumber(el.block_timestamp).div(1000).dp(0, BigNumber.ROUND_DOWN).toFixed(),
+                hash: el.txID,
+                from: value.owner_address && fromHex(value.owner_address),
+                to: to && fromHex(to),
+                // @ts-ignore
+                value: value.amount || '0',
+                fee: el.ret[0].fee + '',
+                isError: el.ret[0].contractRet !== 'SUCCESS',
+                // @ts-ignore
+                input: value.data,
+            }
+        }
+        return null
+    }).filter(el => !!el) as GetEtherCompatTxListResponse[]
+}
+
+export function formatToEtherscanLogs(data: GetTronLogsResponse[]): GetEtherCompatLogsResponse[] {
+    return data.map(el => {
         return {
             address: el.contract_address,
             result: el.result,
@@ -53,10 +69,6 @@ export function formatToEtherscanLogs(response: TronData<GetTronLogsResponse[]>)
             eventName: el.event_name,
         }
     })
-    return {
-        ...response,
-        data
-    }
 }
 
 export function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options: { dataCompatible?: boolean } & FetchCustomConfig = { dataCompatible: false }) {
@@ -146,15 +158,7 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
     const tronscan = tronscanAPI(chainOrBaseURL, apiKey, customFetch, options)
 
     const retries = typeof options.retry === 'string' ? options.retry : (typeof options.retry === 'number' ? options.retry : 3)
-    const operation = retry.operation(Object.assign({
-        minTimeout: 10000,
-        maxTimeout: 30000,
-        randomize: false
-    }, typeof retries === 'string' ? {
-        forever: true
-    } : {
-        retries: retries,
-    }))
+
     function fetchPageData<Query extends TronPageQuery, ResponseItem>(getData: (query: Query) => Promise<TronData<ResponseItem[]>>, matchFields?: (item: ResponseItem) => { blockTimestamp: number, blockNumber?: number, hash: string, logIndex?: number }) {
         return function (query: Query, cb: (currentPageData: ResponseItem[], currentPageIndex: number, accumulatedData: ResponseItem[], isFinish: boolean) => void, autoStart?: boolean) {
             const data: ResponseItem[] = []
@@ -164,7 +168,18 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
             let index = 0
             let nextQuery = query
 
+            const operation = retry.operation(Object.assign({
+                minTimeout: 10000,
+                maxTimeout: 30000,
+                randomize: false
+            }, typeof retries === 'string' ? {
+                forever: true
+            } : {
+                retries: retries,
+            }))
+
             const request = async function (): Promise<TronData<ResponseItem[]>> {
+
                 try {
                     let data: TronData<ResponseItem[]>
                     if (!nextLink) {
@@ -178,7 +193,6 @@ export function tronscanPageData(chainOrBaseURL: string, apiKey?: string, custom
                     nextLink = data.meta.links?.next || ''
                     return data
                 } catch (e) {
-                    debugger
                     //@ts-ignore
                     if (e?.response?.data?.statusCode === 400 && matchFields) {
                         const { blockTimestamp } = matchFields(last(data)!)

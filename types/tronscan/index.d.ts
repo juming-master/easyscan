@@ -2,8 +2,8 @@ import { TronData, GetEtherCompatLogsResponse, GetTronAccountInfoQuery, GetTronT
 import { GetEtherCompatTxListResponse } from '../types';
 import { CustomFetch, FetchCustomConfig } from '../types';
 import TronProvider from './tron-jsonrpc-provider';
-export declare function formatToEtherscanTxs(response: TronData<GetTronAccountTxListResponse[]>): TronData<GetEtherCompatTxListResponse[]>;
-export declare function formatToEtherscanLogs(response: TronData<GetTronLogsResponse[]>): TronData<GetEtherCompatLogsResponse[]>;
+export declare function formatToEtherscanTxs(data: GetTronAccountTxListResponse[]): GetEtherCompatTxListResponse[];
+export declare function formatToEtherscanLogs(data: GetTronLogsResponse[]): GetEtherCompatLogsResponse[];
 export declare function tronscanAPI(chainOrBaseURL: string, apiKey?: string, customFetch?: CustomFetch, options?: {
     dataCompatible?: boolean;
 } & FetchCustomConfig): {

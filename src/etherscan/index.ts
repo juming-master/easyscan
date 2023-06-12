@@ -273,16 +273,13 @@ export function etherscanAPI(chainOrBaseURL: string, apiKey: string, customFetch
             /**
              * Get a list of transactions for a specfic address
              */
-            txList: async function (query: AccountTxListQuery): Promise<Data<(AccountTxListResponse | GetEtherCompatTxListResponse)[]>> {
+            txList: async function (query: AccountTxListQuery): Promise<Data<(AccountTxListResponse)[]>> {
                 const result = await get<AccountTxListResponse[]>(Module.Account, Object.assign({
                     action: 'txlist',
                     startblock: 0,
                     endblock: 'latest',
                     sort: Sort.ASC
                 }, omit(query, 'compatable')));
-                if (query.compatable) {
-                    return handleTxList(result)
-                }
                 return result
             },
             /**

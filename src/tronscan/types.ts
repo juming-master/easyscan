@@ -7,6 +7,12 @@ export enum TronStatus {
 export type TronHexString = string
 export type TronBase58String = string
 
+export type TronScanAPIListData<T> = {
+    "total": number,
+    "rangeTotal": number,
+    "data": T
+}
+
 export type TronData<T> = {
     data: T,
     success: boolean,
@@ -33,6 +39,13 @@ export enum BlockTimestampSort {
     DESC = 'block_timestamp,desc',
 }
 
+export interface TronScanAPIListPageQuery {
+    startTimestamp?: number,
+    endTimestamp?: number,
+    page?:number,
+    offset?: number,
+}
+
 export interface TronPageQuery {
     limit?: number,
     orderBy?: BlockTimestampSort,
@@ -41,7 +54,7 @@ export interface TronPageQuery {
 }
 
 export interface PageResponse {
-    
+
 }
 
 
@@ -61,7 +74,9 @@ export type GetTronAccountTxListQuery = TronPageQuery & OnlyConfirmQuery & {
     onlyTo?: boolean,
     searchInternal?: boolean
 }
-
+export interface GetTronScanAccountTxListResponse {
+    
+}
 
 export interface GetTronAccountTxListResponse {
     ret: [

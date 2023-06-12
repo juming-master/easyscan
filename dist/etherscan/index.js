@@ -269,9 +269,6 @@ function etherscanAPI(chainOrBaseURL, apiKey, customFetch, options = { debug: fa
                         endblock: 'latest',
                         sort: types_1.Sort.ASC
                     }, (0, lodash_1.omit)(query, 'compatable')));
-                    if (query.compatable) {
-                        return handleTxList(result);
-                    }
                     return result;
                 });
             },
